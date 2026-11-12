@@ -1,9 +1,9 @@
 # Unhoard – outreach drafts
 
-> **DRAFTS ONLY. Nothing here has been sent or posted.** Edit, fill the TODOs, and send or post them yourself.
+> **DRAFTS ONLY. Nothing here has been sent or posted.** Edit the [bracketed] bits, then send or post them yourself.
 > Never name or criticise another app; let readers compare for themselves.
 
-Links to fill in: App Store `TODO`, site https://kleash.github.io/unhoard/, code https://github.com/kleash/unhoard.
+Links: App Store https://apps.apple.com/app/id6833769781, site https://kleash.github.io/unhoard/, code https://github.com/kleash/unhoard.
 
 ---
 
@@ -24,7 +24,7 @@ delete tray and delete them in one step. Favourites and photos in your albums ar
 The scan runs on the iPhone; nothing is uploaded. (There's an optional AI second opinion that uses the reader's own
 API key, and it shows exactly what it would send first.)
 
-- App Store: TODO
+- App Store: https://apps.apple.com/app/id6833769781
 - Website: https://kleash.github.io/unhoard/
 - Source: https://github.com/kleash/unhoard
 
@@ -74,7 +74,7 @@ Things I'd rather be upfront about:
   with your own API key. A consent sheet shows the exact ≤512 px previews first (no location, dates or EXIF), and
   sensitive or hidden photos are never sent. It's the only network request the app makes.
 
-Deletes go to Recently Deleted (30 days). App Store: TODO. I'd love feedback on the detection, especially from
+Deletes go to Recently Deleted (30 days). App Store: https://apps.apple.com/app/id6833769781. I'd love feedback on the detection, especially from
 people with big libraries.
 
 ---
@@ -110,7 +110,7 @@ What it does:
 Honest limits: blurry detection is cautious and finds only a few, and exact duplicates are left to the Photos
 Duplicates album. Deleted items go to Recently Deleted, so empty that in Photos to get the space back.
 
-App Store: TODO. I'd love feedback, especially on what it misses.
+App Store: https://apps.apple.com/app/id6833769781. I'd love feedback, especially on what it misses.
 
 ---
 
@@ -125,7 +125,7 @@ So I built Unhoard. It finds screenshots, blurry and similar shots, big videos a
 
 Free: no subscription, no ads, no account. The scan runs on the iPhone, and the code is open source.
 
-App Store: [TODO]
+App Store: apps.apple.com/app/id6833769781
 Code: github.com/kleash/unhoard
 ```
 
@@ -142,7 +142,7 @@ email (section 1) is outreach to people you don't know.
 
 **Name:** Unhoard
 **Platform:** iPhone · **License:** Free, Open Source (MIT)
-**Links:** https://kleash.github.io/unhoard/ · https://github.com/kleash/unhoard · App Store TODO
+**Links:** https://kleash.github.io/unhoard/ · https://github.com/kleash/unhoard · https://apps.apple.com/app/id6833769781
 **Tags:** photo-cleaner, storage-cleaner, privacy, open-source, no-subscription
 
 **Description:**

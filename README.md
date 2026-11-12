@@ -11,8 +11,7 @@
 </p>
 
 <p align="center">
-  <!-- TODO: when the app is live, link this badge to its App Store page and change "coming soon" to "download". -->
-  <img src="https://img.shields.io/badge/App_Store-coming_soon-8b5cf6?logo=appstore&logoColor=white" alt="App Store: coming soon">
+  <a href="https://apps.apple.com/app/id6833769781"><img src="https://img.shields.io/badge/App_Store-download-8b5cf6?logo=appstore&logoColor=white" alt="Download on the App Store"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a855f7" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/iOS-18%2B-c026d3?logo=apple&logoColor=white" alt="iOS 18 or later">
   <img src="https://img.shields.io/badge/Swift-SwiftUI-db2777?logo=swift&logoColor=white" alt="Swift and SwiftUI">
@@ -21,6 +20,7 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.apple.com/app/id6833769781"><b>App Store</b></a> ·
   <a href="https://kleash.github.io/unhoard/">Website</a> ·
   <a href="https://kleash.github.io/unhoard/support.html">Support</a> ·
   <a href="https://kleash.github.io/unhoard/privacy.html">Privacy</a> ·
