@@ -49,7 +49,10 @@ extension CleanerLibrary {
         return { [weak self] finished in
             if #available(iOS 26.0, *), let task = self?.continuedTask as? BGContinuedProcessingTask {
                 task.progress.completedUnitCount = finished ? task.progress.totalUnitCount : task.progress.completedUnitCount
-                task.setTaskCompleted(success: finished)
+                // Stopped early, the work isn't lost (the next scan resumes from the checkpoints), so say so rather than
+                // "Task failed". (A killed app still shows that: iOS marks it, not us.)
+                if !finished { task.updateTitle(task.title, subtitle: "Paused · carries on next time you open Unhoard") }
+                task.setTaskCompleted(success: true)
             }
             self?.continuedTask = nil
             self?.scheduleOvernightScan(!finished)

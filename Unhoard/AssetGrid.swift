@@ -157,7 +157,7 @@ struct AssetGrid<Header: View>: View {
     enum TrayFilter: String, CaseIterable { case all = "All", selected = "Selected", notSelected = "Not Selected" }
     private func passes(_ r: AssetRecord) -> Bool { filter == .all || tray.contains(r.id) == (filter == .selected) }
     private var shown: [AssetRecord] { filter == .all ? items : items.filter(passes) }
-    private var shownGroups: [[AssetRecord]]? { groups.map { $0.map { $0.filter(passes) }.filter { !$0.isEmpty } } }
+    private var shownGroups: [[AssetRecord]]? { filter == .all ? groups : groups.map { $0.map { $0.filter(passes) }.filter { !$0.isEmpty } } }
     private let spacing: CGFloat = 2
 
     private var side: CGFloat { max(1, (width - spacing * CGFloat(columns - 1)) / CGFloat(columns)) }
@@ -244,7 +244,7 @@ struct AssetGrid<Header: View>: View {
             .onTapGesture { tray.toggle(record.id) }
             .onLongPressGesture(minimumDuration: 0.25) { preview = record }
             .accessibilityAction(named: "Preview") { preview = record }
-            .onAppear { if i % columns == 0 || shownGroups != nil { cache(around: i) } }
+            .onAppear { if i % columns == 0 || groups != nil { cache(around: i) } }
     }
 
     private func isSelected(_ i: Int, _ r: AssetRecord) -> Bool {
@@ -261,7 +261,7 @@ struct AssetGrid<Header: View>: View {
 
     private func dragged(_ p: CGPoint, _ state: UIGestureRecognizer.State) {
         // shortcut: no drag-select in grouped grids (headers break the row maths); tap items there.
-        guard !shown.isEmpty, shownGroups == nil else { return }
+        guard !shown.isEmpty, groups == nil else { return }
         switch state {
         case .began:
             let i = index(at: p)
