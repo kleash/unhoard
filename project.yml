@@ -32,7 +32,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Unhoard looks through your photo library on this iPhone to find screenshots, similar and blurry shots, large videos and accidental clips, and deletes only the items you choose. Nothing leaves your iPhone unless you ask Claude for a second opinion.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Unhoard looks through your photo library on this iPhone to find screenshots, similar and blurry shots, large videos and accidental clips, and deletes only the items you choose.
         INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Unhoard saves the still photos you make from short clips to your photo library.
   UnhoardTests:
     type: bundle.unit-test
