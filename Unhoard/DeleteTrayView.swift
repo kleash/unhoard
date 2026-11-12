@@ -35,7 +35,7 @@ struct DeleteButton: View {
         .scaleEffect(count > 0 ? 1 : 0.8)
         .disabled(count == 0)
         .accessibilityHidden(count == 0)
-        .accessibilityLabel("Delete \(count) items, \(bytes.formatted(.byteCount(style: .file)))")
+        .accessibilityLabel("Delete ^[\(count) item](inflect: true), \(bytes.formatted(.byteCount(style: .file)))")
         .accessibilityHint("Review the delete tray and confirm.")
         .accessibilityIdentifier("deleteButton")
         .animation(.snappy, value: count)
@@ -85,7 +85,7 @@ struct DeleteCommitSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .accessibilityElement(children: .combine)
-                    Text("\(selected.count - videos) photos · \(videos) videos").font(.subheadline).foregroundStyle(.secondary)
+                    Text("^[\(selected.count - videos) photo](inflect: true) · ^[\(videos) video](inflect: true)").font(.subheadline).foregroundStyle(.secondary)
                     Divider()
                     Label("They stay in Recently Deleted for 30 days, so you can still get them back.", systemImage: "clock.arrow.circlepath")
                     Label("If your library is an iCloud Shared Library, deleting removes items for everyone in it.", systemImage: "person.2")
@@ -116,7 +116,7 @@ struct DeleteCommitSheet: View {
                         Task { await commit(selected) }
                     } label: {
                         Group {
-                            if deleting { ProgressView() } else { Label("Delete \(selected.count) Items", systemImage: "trash.fill") }
+                            if deleting { ProgressView() } else { Label("Delete ^[\(selected.count) Item](inflect: true)", systemImage: "trash.fill") }
                         }
                         .font(.headline)
                         .frame(maxWidth: .infinity)
