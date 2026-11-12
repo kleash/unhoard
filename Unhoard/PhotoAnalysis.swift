@@ -55,8 +55,8 @@ enum PhotoAnalysis {
                 if let r = result { cache.records[r.id] = r } // nil: no local thumbnail, retried next scan
                 if n % 10 == 0 {
                     let done = doneBefore + n
-                    await progress(LibraryScanner.progressText("Analysing photos", done, photos.count, since: started, resumedAt: doneBefore),
-                                   Double(done) / Double(photos.count))
+                    await progress(LibraryScanner.progressText(.photos, done, photos.count, since: started, resumedAt: doneBefore),
+                                   LibraryScanner.ScanStep.photos.overall(done, photos.count))
                 }
                 if Date().timeIntervalSince(lastSave) > LibraryScanner.checkpointInterval { await checkpoint(cache); lastSave = Date() }
                 feed()
@@ -85,8 +85,10 @@ enum PhotoAnalysis {
             return nil
         }, update: { r, i in
             cache.records[r.id] = r
+            if i % 25 == 0 {
+                await progress(LibraryScanner.progressText(.similar, i, chain.count, since: started), LibraryScanner.ScanStep.similar.overall(i, chain.count))
+            }
             if Date().timeIntervalSince(lastSave) > LibraryScanner.checkpointInterval {
-                await progress(LibraryScanner.progressText("Finding similar shots", i, chain.count, since: started), Double(i) / Double(chain.count))
                 await checkpoint(cache)
                 lastSave = Date()
             }

@@ -61,7 +61,7 @@ extension CleanerLibrary {
     func reportBackgroundProgress(_ text: String, _ fraction: Double) {
         guard #available(iOS 26.0, *), let task = continuedTask as? BGContinuedProcessingTask else { return }
         task.progress.completedUnitCount = Int64(fraction * Double(task.progress.totalUnitCount))
-        task.updateTitle(task.title, subtitle: text)
+        task.updateTitle(task.title, subtitle: text.replacingOccurrences(of: "\n", with: " · "))
     }
 
     /// A one-off identifier per scan under `<bundle>.scan.*`, registered just before submitting: iOS doesn't route

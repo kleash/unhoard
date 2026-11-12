@@ -195,8 +195,18 @@ struct CleanerHero: View {
                     }
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    ProgressView(value: library.fraction)
-                    Text(status).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                    // One segment per pass, so a full first bar doesn't read as "done".
+                    HStack(spacing: 4) {
+                        ForEach(LibraryScanner.ScanStep.allCases, id: \.self) { step in
+                            ProgressView(value: step.fill(library.fraction))
+                        }
+                    }
+                    let lines = status.split(separator: "\n", maxSplits: 1)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(lines.first ?? "").font(.subheadline.weight(.semibold))
+                        if lines.count > 1 { Text(lines[1]).font(.footnote).foregroundStyle(.secondary) }
+                    }
+                    .monospacedDigit()
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("scanStatus")

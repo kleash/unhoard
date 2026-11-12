@@ -298,7 +298,6 @@ enum LibraryScanner {
     /// Cancelling the calling task stops the scan early: it checkpoints what it has and returns, and the next scan resumes from there.
     static func scan(_ start: ScanCache, checkpoint: (ScanCache) async -> Void, progress: (String, Double) async -> Void) async -> ScanCache {
         var cache = start
-        var clipShare = 1.0 // of the overall fraction; a full pass takes the first 90 %
         let token = PHPhotoLibrary.shared().currentChangeToken // taken first, so changes during the scan show up next time
         // Albums chat apps make count as chat saves, not as the user's own albums (which the memory guard protects).
         let albums = assetIDs(in: .album, .albumRegular) { AssetRecord.chatApp(albumTitle: $0.localizedTitle) == nil }
@@ -326,7 +325,6 @@ enum LibraryScanner {
             fresh.reserveCapacity(all.count)
             var lastSave = Date()
             let started = Date()
-            clipShare = 0.1
             for i in 0..<all.count {
                 if Task.isCancelled { // stopped (background time ran out): keep what's done, still without a token
                     let partial = ScanCache(records: ScanCache.merge(cache.records, fresh: fresh, deleted: [], fullPass: false))
@@ -342,7 +340,7 @@ enum LibraryScanner {
                 } else {
                     fresh.append(record(a))
                 }
-                if i % 250 == 0 { await progress(progressText("Scanning", i, all.count, since: started), 0.9 * Double(i) / Double(all.count)) }
+                if i % 250 == 0 { await progress(progressText(.reading, i, all.count, since: started), ScanStep.reading.overall(i, all.count)) }
                 if Date().timeIntervalSince(lastSave) > checkpointInterval { // resumable: a relaunch keeps these records
                     await checkpoint(ScanCache(records: ScanCache.merge(cache.records, fresh: fresh, deleted: [], fullPass: false)))
                     lastSave = Date()
@@ -364,8 +362,7 @@ enum LibraryScanner {
         let started = Date()
         for (n, id) in pending.enumerated() {
             if Task.isCancelled { break } // the rest stay unchecked (nil) for the next scan
-            await progress(progressText("Checking short clips", n, pending.count, since: started),
-                           1 - clipShare + clipShare * Double(n) / Double(pending.count))
+            await progress(progressText(.clips, n, pending.count, since: started), ScanStep.clips.overall(n, pending.count))
             guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
                   let video = try? await ClipTools.avAsset(asset, fast: true) else { continue } // retried next scan
             cache.records[id]?.accident = (try? await ClipTools.isAccident(video)) ?? false
@@ -376,17 +373,48 @@ enum LibraryScanner {
         return cache
     }
 
-    /// "Scanning 13% · 1,234 of 9,876 · about 2 min left" (the estimate once there's enough to go on).
-    /// `resumedAt` is how many were already done when this run started (the estimate uses only this run's pace).
-    static func progressText(_ verb: String, _ done: Int, _ total: Int, since start: Date, resumedAt: Int = 0) -> String {
+    /// "Step 3 of 4 · Looking at each photo", a newline, then "13% · 1,234 of 9,876 · about 2 min left" (the estimate
+    /// once there's enough to go on). `resumedAt` is how many were already done when this run started (the estimate uses
+    /// only this run's pace).
+    static func progressText(_ step: ScanStep, _ done: Int, _ total: Int, since start: Date, resumedAt: Int = 0) -> String {
         let f = Double(done) / Double(max(total, 1))
-        var text = "\(verb) \(Int(f * 100))% · \(done.formatted()) of \(total.formatted())"
+        var text = "Step \(step.rawValue) of \(ScanStep.allCases.count) · \(step.title)\n\(Int(f * 100))% · \(done.formatted()) of \(total.formatted())"
         let elapsed = Date().timeIntervalSince(start), thisRun = done - resumedAt
         if Double(thisRun) / Double(max(total - resumedAt, 1)) > 0.01, elapsed > 2 {
             let left = Duration.seconds(elapsed * Double(total - done) / Double(thisRun))
             text += " · about \(left.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 1))) left"
         }
         return text
+    }
+
+    /// The scan's passes, in order, so people see there's more to come after the first bar fills.
+    enum ScanStep: Int, CaseIterable {
+        case reading = 1, clips, photos, similar
+
+        var title: String {
+            switch self {
+            case .reading: "Reading your library"
+            case .clips: "Checking short clips"
+            case .photos: "Looking at each photo"
+            case .similar: "Grouping similar shots"
+            }
+        }
+
+        /// Where the step sits in the whole scan, by its usual share of the time.
+        var span: (start: Double, width: Double) {
+            switch self {
+            case .reading: (0, 0.1)
+            case .clips: (0.1, 0.05)
+            case .photos: (0.15, 0.6)
+            case .similar: (0.75, 0.25)
+            }
+        }
+
+        /// The whole scan's fraction when this step is `done` of `total` through.
+        func overall(_ done: Int, _ total: Int) -> Double { span.start + span.width * min(1, Double(done) / Double(max(total, 1))) }
+
+        /// How far through this step a whole-scan `fraction` is, 0...1.
+        func fill(_ fraction: Double) -> Double { min(1, max(0, (fraction - span.start) / span.width)) }
     }
 
     /// Changed (inserted or updated) and deleted asset ids since `data`'s token, or nil when a full pass is needed.

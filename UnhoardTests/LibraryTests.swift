@@ -292,10 +292,23 @@ final class ScannerResumeTests: XCTestCase {
         XCTAssertEqual(again.records, done.records)
     }
 
+    func testScanStepsCoverTheWholeBarInOrder() {
+        typealias Step = LibraryScanner.ScanStep
+        XCTAssertEqual(Step.reading.overall(0, 100), 0)
+        XCTAssertEqual(Step.similar.overall(100, 100), 1, accuracy: 1e-9)
+        for (a, b) in zip(Step.allCases, Step.allCases.dropFirst()) {
+            XCTAssertEqual(a.overall(1, 1), b.overall(0, 1), accuracy: 1e-9, "\(b) starts where \(a) ends")
+        }
+        let mid = Step.photos.overall(50, 100) // halfway through photos: earlier steps full, later empty
+        XCTAssertEqual(Step.clips.fill(mid), 1)
+        XCTAssertEqual(Step.photos.fill(mid), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(Step.similar.fill(mid), 0)
+    }
+
     func testResumedProgressCountsTheWholeLibraryAndEstimatesFromThisRun() {
         // 500 of 1,000 were done before; this run did 100 more in 100 s, so 400 left at 1/s.
-        let text = LibraryScanner.progressText("Analysing photos", 600, 1000, since: Date(timeIntervalSinceNow: -100), resumedAt: 500)
-        XCTAssertTrue(text.hasPrefix("Analysing photos 60% · 600 of 1,000"), text)
+        let text = LibraryScanner.progressText(.photos, 600, 1000, since: Date(timeIntervalSinceNow: -100), resumedAt: 500)
+        XCTAssertTrue(text.hasPrefix("Step 3 of 4 · Looking at each photo\n60% · 600 of 1,000"), text)
         XCTAssertTrue(text.contains("about 7 min left") || text.contains("about 6 min left"), text)
     }
 }
