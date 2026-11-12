@@ -289,7 +289,7 @@ struct SimilarCompareView: View {
                             .font(.title2)
                             .foregroundStyle(.yellow)
                             .padding(10)
-                            .cleanerGlass(Circle())
+                            .background(.black.opacity(0.5), in: Circle()) // not glass: on the photo it blurred the whole keeper
                             .offset(y: -6)
                             .symbolEffect(.bounce, value: keeper)
                             .transition(.scale.combined(with: .opacity))

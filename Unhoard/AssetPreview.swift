@@ -181,8 +181,10 @@ struct AssetMediaView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .task(id: record.id) {
-                guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [record.id], options: nil).firstObject else { return }
+            // Keyed on the size too: a cover's first layout can be near zero, and an image asked for at that size stays tiny.
+            .task(id: "\(record.id) \(Int(geo.size.width))x\(Int(geo.size.height))") {
+                guard geo.size.width > 20, geo.size.height > 20,
+                      let asset = PHAsset.fetchAssets(withLocalIdentifiers: [record.id], options: nil).firstObject else { return }
                 let size = CGSize(width: geo.size.width * displayScale, height: geo.size.height * displayScale)
                 if record.isVideo, let item = await Self.playerItem(asset) {
                     let p = AVPlayer(playerItem: item)

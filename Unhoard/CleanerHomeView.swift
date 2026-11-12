@@ -325,7 +325,7 @@ struct CategoryCard: View {
                 .font(.headline)
                 .lineLimit(2, reservesSpace: true)
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(items.count.formatted()).cleanerNumber(.title)
+                Text(items.count.formatted()).cleanerNumber(.title).fixedSize() // the detail wraps, never the number
                 Text(detail(items, inTray: inTray))
                     .font(.caption)
                     .foregroundStyle(.secondary)
