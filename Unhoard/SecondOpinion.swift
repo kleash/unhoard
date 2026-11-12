@@ -272,6 +272,7 @@ struct SecondOpinionButton: View {
     let items: [AssetRecord]
     @Environment(CleanerLibrary.self) private var library
     @State private var settings = false
+    @State private var askAfterKey = false // opened Settings from Ask: carry on to the consent sheet once a key is saved
     @State private var consent = false
     @State private var progress: String?
     @State private var failure: String?
@@ -286,7 +287,7 @@ struct SecondOpinionButton: View {
                 Text(appleReason ?? "Free and private")
             }
             .disabled(appleReason != nil || pending.isEmpty)
-            Button { if CleanerKeyStore.load() == nil { settings = true } else { consent = true } } label: {
+            Button { if CleanerKeyStore.load() == nil { askAfterKey = true; settings = true } else { consent = true } } label: {
                 Label("Ask Claude (optional)…", systemImage: "sparkles")
                 Text("Not needed · sends small previews to Anthropic")
             }
@@ -298,7 +299,10 @@ struct SecondOpinionButton: View {
         }
         .disabled(progress != nil || library.isScanning)
         .accessibilityIdentifier("secondOpinionButton")
-        .sheet(isPresented: $settings) { SecondOpinionSettings() }
+        .sheet(isPresented: $settings, onDismiss: {
+            if askAfterKey, CleanerKeyStore.load() != nil { consent = true }
+            askAfterKey = false
+        }) { SecondOpinionSettings(asking: askAfterKey) }
         .sheet(isPresented: $consent) { SecondOpinionConsentSheet(records: Array(pending.prefix(SecondOpinion.maxPerAsk))).environment(library) }
         .alert("Second opinion stopped", isPresented: Binding { failure != nil } set: { if !$0 { failure = nil } }) {
             Button("OK") {}
@@ -424,6 +428,8 @@ struct SecondOpinionConsentSheet: View {
 
 /// Paste or remove the Anthropic key; shows whether Apple's on-device model is available.
 struct SecondOpinionSettings: View {
+    /// Opened from an Ask button without a key: says so, and closes once a key is saved so the ask carries on.
+    var asking = false
     @Environment(\.dismiss) private var dismiss
     @State private var key = ""
     @State private var saved = CleanerKeyStore.load() != nil
@@ -451,6 +457,11 @@ struct SecondOpinionSettings: View {
                           systemImage: SecondOpinion.appleUnavailableReason == nil ? "checkmark.seal.fill" : "iphone.slash")
                 }
                 Section {
+                    if asking && !saved {
+                        Label("To ask Claude, paste your Anthropic API key here. You'll see exactly what would be sent before anything goes.", systemImage: "key.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
                     SecureField(saved ? "A key is saved — paste to replace" : "Anthropic API key", text: $key)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -461,6 +472,7 @@ struct SecondOpinionSettings: View {
                             key = ""
                             saved = true
                             message = "Key saved on this iPhone."
+                            if asking { dismiss() }
                         } catch { message = error.localizedDescription }
                     }
                     .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

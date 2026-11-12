@@ -10,6 +10,7 @@ struct CategoryGridView: View {
     @State private var comparing: CompareGroup?
     @State private var asking: [[[AssetRecord]]]? // Similar batches waiting for consent
     @State private var settings = false
+    @State private var waiting: [[AssetRecord]]? // groups to ask Claude about once a key is saved
 
     var body: some View {
         let items = library.sections[category] ?? []
@@ -70,7 +71,10 @@ struct CategoryGridView: View {
         .fullScreenCover(item: $comparing) {
             SimilarCompareView(group: $0.items).environment(library).environment(tray)
         }
-        .sheet(isPresented: $settings) { SecondOpinionSettings() }
+        .sheet(isPresented: $settings, onDismiss: {
+            if let groups = waiting, CleanerKeyStore.load() != nil { ask(groups) }
+            waiting = nil
+        }) { SecondOpinionSettings(asking: waiting != nil) }
         .sheet(isPresented: Binding { asking != nil } set: { if !$0 { asking = nil } }) {
             if let asking { SecondOpinionConsentSheet(records: Array(asking[0].joined()), batches: asking).environment(library) }
         }
@@ -112,7 +116,7 @@ struct CategoryGridView: View {
     /// Similar groups to Claude: the key first if there's none, then the consent sheet.
     private func ask(_ groups: [[AssetRecord]]) {
         let batches = SecondOpinion.batches(groups)
-        if CleanerKeyStore.load() == nil { settings = true } else if !batches.isEmpty { asking = batches }
+        if CleanerKeyStore.load() == nil { waiting = groups; settings = true } else if !batches.isEmpty { asking = batches }
     }
 
     /// Similar shots: all but each group's keeper go to the tray (the memory guard still applies).

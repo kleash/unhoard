@@ -265,10 +265,7 @@ final class WalkthroughUITests: XCTestCase {
         if el("apiKeyField").waitForExistence(timeout: 3) {
             el("apiKeyField").tap()
             el("apiKeyField").typeText("sk-ant-walkthrough-not-a-real-key")
-            el("apiKeySave").tap()
-            el("settingsDone").tap()
-            el("secondOpinionButton").tap()
-            askClaude.tap()
+            el("apiKeySave").tap() // saving from an ask closes Settings and carries on to the consent sheet
         }
         XCTAssertTrue(el("consentTitle").waitForExistence(timeout: 5))
         sleep(3) // previews load
