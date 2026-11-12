@@ -330,6 +330,7 @@ struct CategoryCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .minimumScaleFactor(0.8)
             }
         }
         .padding(14)
@@ -370,6 +371,6 @@ struct CategoryCard: View {
         guard !items.isEmpty else { return "none yet" }
         var parts = [items.reduce(Int64(0)) { $0 + $1.bytes }.formatted(.byteCount(style: .file))]
         if inTray > 0 { parts.append("\(inTray) in tray") }
-        return parts.joined(separator: " · ")
+        return parts.joined(separator: "\n") // a line each: beside a 4-digit count, "18.13 GB · 730 in tray" got cut
     }
 }
