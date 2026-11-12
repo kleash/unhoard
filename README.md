@@ -1,6 +1,25 @@
-# Tidyroll
+# Unhoard
 
-Tidyroll is an iPhone app that helps you clean up your photo library. It finds screenshots and screen recordings,
+**Clear screenshots, blurry photos, similar shots and big videos off your iPhone with a swipe.**
+
+<!-- TODO: replace with the App Store link (and badge) once the app is live. -->
+**App Store:** coming soon · **Website:** [kleash.github.io/unhoard](https://kleash.github.io/unhoard/) ·
+[Support](https://kleash.github.io/unhoard/support.html) · [Privacy](https://kleash.github.io/unhoard/privacy.html)
+
+<!-- TODO: add 3–5 screenshots or a short demo GIF here (files not created yet). -->
+
+## Why Unhoard
+
+- **Free.** No subscription, no ads, no in-app purchases, no account.
+- **Nothing leaves your iPhone.** Scanning and analysis run on the iPhone. The one exception is opt-in: a second
+  opinion from Claude with your own API key, after a consent sheet shows exactly what will be sent.
+- **Careful.** Favourites, edited photos and photos in your albums are never selected for you, and deleted items wait
+  in Recently Deleted for 30 days.
+- **Open source.** MIT-licensed; every line is here to read.
+
+## What it does
+
+Unhoard is an iPhone app that helps you clean up your photo library. It finds screenshots and screen recordings,
 similar shots, blurry photos, utility shots (receipts, labels, whiteboards), sensitive photos (passports, cards,
 passwords), large videos, accidental clips, short moments and media saved from chat and social apps. You review them in a grid or one at a
 time with swipes, collect what should go in a delete tray, and delete it all in one step.
@@ -37,8 +56,9 @@ time with swipes, collect what should go in a delete tray, and delete it all in 
   instead of the best pick (the old keeper goes to the tray, unless the memory guard protects it).
 - **Delete tray**: the floating Delete button shows the count and size and opens the tray. The tray is saved across
   launches. Tap an item to keep it. Delete runs one PhotoKit request, so iOS asks for confirmation once. Deleted items
-  stay in Recently Deleted for 30 days. Afterwards a summary shows what was freed, and **History** (on the home screen)
-  charts what you've freed over time, kept in a small file on the iPhone. If your library is an iCloud Shared Library, deleting removes items for
+  stay in Recently Deleted for 30 days, and the space comes back only when Recently Deleted is emptied (iPhone does it
+  after 30 days; the summary tells you how to do it now, since apps can't). Afterwards a summary shows what was cleared, and **History** (on the home screen)
+  charts what you've cleared over time, kept in a small file on the iPhone. If your library is an iCloud Shared Library, deleting removes items for
   everyone in it.
 - **AI second opinion** (Utility Shots): labels each borderline photo a *memory*, *utility* shot or *accident*, with a
   one-line reason, and sorts memories last. It never deletes or selects anything. On iOS 27 with Apple Intelligence
@@ -63,8 +83,8 @@ All on local thumbnails with Apple's Vision framework (iOS 18 API), in `PhotoAna
 | Category | Uses | Threshold and why |
 | --- | --- | --- |
 | Utility Shots | `CalculateImageAestheticsScoresRequest`: `isUtility`, `overallScore` (-1…1) | `isUtility` or score < 0. Apple's private Photos score isn't available, so this is Vision's own scale: on sample pictures real scenes scored 0.45–0.9, a receipt 0.1 (utility), flat graphics -0.2 to -0.4; 0 is the midpoint. Not yet calibrated on a real library; on one, about a fifth of low scorers were real memories (night, festival, blurry family shots), which is why nothing is pre-selected and the second opinion exists. |
-| Sensitive | Candidates only (utility, low score, screenshot, or `DetectDocumentSegmentationRequest` finds a document): `RecognizeTextRequest` on a 1024 px thumbnail, `DetectBarcodesRequest`, `DetectFaceRectanglesRequest` | Passport/ID MRZ lines (25+ of `A–Z0–9<` with `<<`), card numbers passing Luhn, IBANs passing mod-97, keywords (passport, licence/license, visa, pass, date of birth, DOB, FIN, NRIC, prescription, Rx, SSID, WPA, password, insurance, medical, signature, …), Wi-Fi QR codes, boarding-pass barcodes, PDF417/Aztec codes, or a document with a small face on it. Tuned for recall: a false alarm only keeps an item out of bulk selection. |
-| Similar Shots | `GenerateImageFeaturePrintRequest` on 512 px thumbnails, each photo against the previous one in time (O(n)) | Within 2 minutes and feature-print distance < 0.35. On sample pictures the same scene shifted, cropped, rotated or re-exposed measured 0.002–0.3 (median 0.08), different pictures 0.27–1.66 (median 0.72). |
+| Sensitive | Candidates only (utility, low score, screenshot, or `DetectDocumentSegmentationRequest` finds a document): `RecognizeTextRequest` on a 1024 px thumbnail, `DetectBarcodesRequest`, `DetectFaceRectanglesRequest` | Passport/ID MRZ lines (25+ of `A–Z0–9<` with `<<`), card numbers passing Luhn, IBANs passing mod-97, keywords (passport, licence/license, visa, pass, date of birth, DOB, FIN, NRIC, prescription, Rx, SSID, WPA, password, insurance, medical, signature, …), Wi-Fi QR codes, boarding-pass barcodes, PDF417/Aztec codes, or an ID-shaped document (confident outline, long/short side 1.3–1.7, under 95% of the frame, 3+ text lines on it) with exactly one small face on it. Tuned for recall: a false alarm only keeps an item out of bulk selection. |
+| Similar Shots | `GenerateImageFeaturePrintRequest` on 512 px thumbnails, each photo against the previous one in time (O(n)) | Within 2 minutes and feature-print distance < 0.15. On a real 6,900-photo library, pairs under 0.10 were nearly all re-takes of one shot, 0.10–0.15 mostly, 0.15–0.20 about half, above 0.20 mostly a different pose or framing at the same spot. |
 | Best pick | Favourite, then `DetectFaceCaptureQualityRequest` (when both have faces, 0.05 apart), then sharpness (15% apart), then aesthetics score | |
 | Blurry | Variance of the Laplacian on a 512 px grey copy, in each face box or else each tile of a 3×3 grid, taking the sharpest (so bokeh with a sharp subject passes); `DetectLensSmudgeRequest` (iOS 26+) as a second vote | Blurry below 40 (sharp photos measure in the hundreds), or below 80 with smudge confidence ≥ 0.7. Mean brightness under 0.15 (night shots) is never called blurry, since noise fakes sharpness. |
 
@@ -75,32 +95,32 @@ and it keeps each group's best.
 
 **Simulator:** only text recognition and document detection run there. Aesthetics, feature prints, faces, barcodes and
 lens smudge fail, so Utility Shots shows "Needs an iPhone" and Similar Shots stays empty. Debug builds launched with
-`-TidyrollSimulatorStandIns` (the UI walkthrough does) use stand-ins for aesthetics and feature prints.
+`-UnhoardSimulatorStandIns` (the UI walkthrough does) use stand-ins for aesthetics and feature prints.
 
 ## Privacy
 
-Everything happens on your iPhone. No accounts, no analytics. The only network request Tidyroll makes itself is the
+Everything happens on your iPhone. No accounts, no analytics. The only network request Unhoard makes itself is the
 opt-in Claude second opinion, after the consent sheet, with your own key. Photos may download originals from iCloud
-for previews and short-clip checks; photo analysis never downloads anything. Tidyroll asks for full Photos access to read and delete, and
+for previews and short-clip checks; photo analysis never downloads anything. Unhoard asks for full Photos access to read and delete, and
 for permission to add the stills it makes.
 
 ## Requirements
 
 - Xcode 27.2 (iOS SDK 27), deploying to iOS 18 or later, iPhone only
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (the `.xcodeproj` and `Tidyroll/Info.plist` are generated and not committed)
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) (the `.xcodeproj` and `Unhoard/Info.plist` are generated and not committed)
 
 ## Build, run and test
 
 ```sh
 xcodegen generate
-open Tidyroll.xcodeproj
+open Unhoard.xcodeproj
 ```
 
-Run the `Tidyroll` scheme on a simulator or a device. For a device, pick your team under Signing & Capabilities.
+Run the `Unhoard` scheme on a simulator or a device. For a device, pick your team under Signing & Capabilities.
 
 ```sh
-xcodebuild test -project Tidyroll.xcodeproj -scheme Tidyroll   -destination 'id=<simulator udid>'   # unit tests
-xcodebuild test -project Tidyroll.xcodeproj -scheme TidyrollUI -destination 'id=<simulator udid>'   # walkthrough, screenshots in /tmp/tidyroll-shots/design
+xcodebuild test -project Unhoard.xcodeproj -scheme Unhoard   -destination 'id=<simulator udid>'   # unit tests
+xcodebuild test -project Unhoard.xcodeproj -scheme UnhoardUI -destination 'id=<simulator udid>'   # walkthrough, screenshots in /tmp/unhoard-shots/design
 ```
 
 Add some media to the simulator first with `xcrun simctl addmedia <udid> <files…>`: a few screenshots, clips and
@@ -112,18 +132,18 @@ Some tests read back from Photos (the saved still, the stop-and-resume scan), an
 simulator, which `simctl` alone doesn't grant fully. Install the app once (run the tests once), then:
 
 ```sh
-xcrun simctl privacy <udid> grant photos com.kleash.tidyroll
-xcrun simctl privacy <udid> grant photos-add com.kleash.tidyroll
+xcrun simctl privacy <udid> grant photos com.kleash.unhoard
+xcrun simctl privacy <udid> grant photos-add com.kleash.unhoard
 xcrun simctl shutdown <udid>
 sqlite3 ~/Library/Developer/CoreSimulator/Devices/<udid>/data/Library/TCC/TCC.db \
-  "update access set auth_version=2 where service='kTCCServicePhotos' and client='com.kleash.tidyroll'"
+  "update access set auth_version=2 where service='kTCCServicePhotos' and client='com.kleash.unhoard'"
 xcrun simctl boot <udid>
 ```
 
 ## App Store notes
 
 - **File sizes use an undocumented PhotoKit key.** Sizes are read with `PHAssetResource.value(forKey: "fileSize")`.
-  This isn't public API, so App Review may flag it or a future iOS may drop it. Tidyroll checks that the key exists
+  This isn't public API, so App Review may flag it or a future iOS may drop it. Unhoard checks that the key exists
   first, and when it can't read a size it estimates one from pixel count (photos) or duration × resolution (videos).
   See `AssetRecord.fileSize`.
 - Background scanning only works on a device. The simulator doesn't run continued-processing or processing tasks.
@@ -131,11 +151,11 @@ xcrun simctl boot <udid>
 ## Release
 
 ```sh
-DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh            # archive, check, export build/ios/Tidyroll.ipa
+DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh            # archive, check, export build/ios/Unhoard.ipa
 DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh --upload   # and upload for TestFlight
 ```
 
-The app icon (two glass cards and a sparkle on a violet-to-magenta glow) is drawn by `swift scripts/make-icon.swift Tidyroll/Assets.xcassets/AppIcon.appiconset/AppIcon.png`.
+The app icon (two glass cards and a sparkle on a violet-to-magenta glow) is drawn by `swift scripts/make-icon.swift Unhoard/Assets.xcassets/AppIcon.appiconset/AppIcon.png`.
 
 ## License
 

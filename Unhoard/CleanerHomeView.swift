@@ -4,12 +4,17 @@ import SwiftUI
 struct CleanerHomeView: View {
     let limited: Bool
     @Environment(CleanerLibrary.self) private var library
+    @Environment(DeleteTray.self) private var tray
     @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var path: [CleanupCategory] = []
     @State private var settings = false
     @State private var history = false
     @State private var demo: CleanerCelebration.Summary?
+    @State private var deleting: Set<String>? // one category's tray items, from a card's long-press menu
+    /// Taken on today's date in earlier years; worked out again only when the library's size or the day changes.
+    @State private var onThisDay: [AssetRecord] = []
+    @State private var swipingToday = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -17,7 +22,7 @@ struct CleanerHomeView: View {
                 VStack(spacing: 16) {
                     if limited {
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Tidyroll can see only the photos you picked. Allow Full Access to clean your whole library.",
+                            Label("Unhoard can see only the photos you picked. Allow Full Access to clean your whole library.",
                                   systemImage: "exclamationmark.triangle.fill")
                                 .font(.subheadline)
                             Button("Open Settings") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
@@ -28,21 +33,48 @@ struct CleanerHomeView: View {
                         .cleanerGlass(tint: .orange.opacity(0.25))
                     }
                     CleanerHero { path.append($0) }
+                    if let videos = library.sections[.largeVideos], !videos.isEmpty {
+                        let bytes = videos.reduce(Int64(0)) { $0 + $1.bytes }.formatted(.byteCount(style: .file))
+                        shortcut("Fastest win: \(videos.count.formatted()) \(videos.count == 1 ? "video" : "videos") · \(bytes)",
+                                 "The most space for the fewest decisions.",
+                                 symbol: CleanupCategory.largeVideos.symbol, tint: CleanupCategory.largeVideos.tint, id: "fastestWin") {
+                            path.append(.largeVideos)
+                        }
+                    }
+                    let today = tray.unswiped(onThisDay)
+                    if !today.isEmpty {
+                        shortcut("On this day", "\(today.count.formatted()) from earlier years · swipe to keep or clear",
+                                 symbol: "calendar", tint: .orange, id: "onThisDay") { swipingToday = true }
+                    }
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: typeSize.isAccessibilitySize ? 1 : 2), spacing: 12) {
                         ForEach(CleanupCategory.allCases) { category in
                             NavigationLink(value: category) { CategoryCard(category: category) }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    let ids = tray.ids.intersection((library.sections[category] ?? []).map(\.id))
+                                    if !ids.isEmpty {
+                                        Button("Delete \(ids.count.formatted()) Selected", systemImage: "trash", role: .destructive) { deleting = ids }
+                                    }
+                                }
                         }
                     }
-                    Label("Everything stays on this iPhone unless you ask Claude for a second opinion.", systemImage: "lock.fill")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Everything stays on this iPhone. Claude is optional and only used if you ask it for a second opinion.", systemImage: "lock.fill")
+                        Label("Check it yourself: Settings › Privacy & Security › App Privacy Report", systemImage: "checkmark.shield")
+                        Link(destination: URL(string: "https://github.com/kleash/unhoard")!) {
+                            Label("Open source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right").foregroundStyle(.tint)
+                        }
+                        .accessibilityIdentifier("githubLink")
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 8)
                 }
                 .padding()
             }
             .background { CleanerBackdrop(tint: .indigo, accent: .pink) }
-            .navigationTitle("Tidyroll")
+            .navigationTitle("Unhoard")
             .navigationDestination(for: CleanupCategory.self) { CategoryGridView(category: $0) }
             .refreshable { await library.scan() }
             .safeAreaInset(edge: .bottom) { DeleteButton() }
@@ -52,8 +84,17 @@ struct CleanerHomeView: View {
             }
             .sheet(isPresented: $settings) { SecondOpinionSettings() }
             .sheet(isPresented: $history) { CleanerHistoryView() }
+            .sheet(isPresented: Binding { deleting != nil } set: { if !$0 { deleting = nil } }) {
+                if let deleting { DeleteCommitSheet(ids: deleting).environment(library).environment(tray) }
+            }
             .sheet(isPresented: Binding { demo != nil } set: { if !$0 { demo = nil } }) {
                 if let demo { CleanerCelebration(summary: demo) }
+            }
+            .fullScreenCover(isPresented: $swipingToday) {
+                SwipeReviewView(items: tray.unswiped(onThisDay), tint: .orange).environment(library).environment(tray)
+            }
+            .task(id: [library.records.count, Calendar.current.component(.day, from: .now)]) {
+                onThisDay = AssetRecord.onThisDay(library.records.values)
             }
         }
         #if DEBUG
@@ -66,6 +107,45 @@ struct CleanerHomeView: View {
             demo = .init(bytes: 1_234_000_000, count: 86, libraryBytes: 30_000_000_000, images: images)
         }
         #endif
+    }
+
+    /// A full-width glass card above the grid that opens something, styled like the category cards.
+    private func shortcut(_ title: String, _ detail: String, symbol: String, tint: Color, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(tint.gradient, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(.headline)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.subheadline.bold()).foregroundStyle(.secondary).accessibilityHidden(true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cleanerGlass(tint: tint.opacity(0.22), interactive: true)
+            .contentShape(RoundedRectangle(cornerRadius: 24))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+}
+
+extension AssetRecord {
+    /// Taken on `today`'s month and day in an earlier year, oldest first: the "On this day" deck.
+    static func onThisDay(_ records: some Sequence<AssetRecord>, today: Date = .now, calendar: Calendar = .current) -> [AssetRecord] {
+        let now = calendar.dateComponents([.year, .month, .day], from: today)
+        return records.filter {
+            guard let created = $0.created else { return false }
+            let c = calendar.dateComponents([.year, .month, .day], from: created)
+            return c.month == now.month && c.day == now.day && c.year! < now.year!
+        }
+        .sorted { $0.created! < $1.created! }
     }
 }
 

@@ -8,6 +8,8 @@ import Photos
         var offered: Set<String> = []
         /// Similar shots: the shots the user made a group's keeper in place of its best pick (optional: older trays lack it).
         var keepers: Set<String>?
+        /// Swipe decks: the items swiped to Keep, so they don't come back (optional: older trays lack it).
+        var kept: Set<String>?
     }
 
     enum Outcome: Equatable { case deleted(Int), cancelled, timedOut, failed(String) }
@@ -15,7 +17,7 @@ import Photos
     private(set) var state = State()
     @ObservationIgnored let file: URL
 
-    init(file: URL = URL.applicationSupportDirectory.appending(path: "Tidyroll/tray.json")) {
+    init(file: URL = URL.applicationSupportDirectory.appending(path: "Unhoard/tray.json")) {
         self.file = file
         if let data = try? Data(contentsOf: file), let saved = try? JSONDecoder().decode(State.self, from: data) { state = saved }
     }
@@ -27,6 +29,14 @@ import Photos
     func toggle(_ id: String) { contains(id) ? remove([id]) : add([id]) }
     func add(_ ids: some Sequence<String>) { change { $0.ids.formUnion(ids) } }
     func remove(_ ids: some Sequence<String>) { change { $0.ids.subtract(ids) } }
+    func keep(_ ids: some Sequence<String>) { change { $0.kept = ($0.kept ?? []).union(ids) } }
+    func unkeep(_ ids: some Sequence<String>) { change { $0.kept?.subtract(ids) } }
+
+    /// What a swipe deck shows: the items neither in the tray nor kept in an earlier deck.
+    func unswiped(_ items: [AssetRecord]) -> [AssetRecord] {
+        let kept = state.kept ?? []
+        return items.filter { !state.ids.contains($0.id) && !kept.contains($0.id) }
+    }
 
     /// Selects the unguarded items not offered before, once: the memory guard keeps favourites, edits and album items out,
     /// and sensitive items are never picked in bulk.
@@ -38,6 +48,9 @@ import Photos
             $0.offered.formUnion(new.map(\.id))
         }
     }
+
+    /// Takes back everything pre-selected for the user (the rules that picked it changed), so it's offered afresh.
+    func forgetPreselection() { change { $0.ids.subtract($0.offered); $0.offered = [] } }
 
     /// The unguarded, non-sensitive items: what Select All adds. With Similar shots' `groups` (keeper first), never a keeper.
     static func selectable(_ items: [AssetRecord], groups: [[AssetRecord]]? = nil) -> [String] {
@@ -72,12 +85,14 @@ import Photos
         try? JSONEncoder().encode(state).write(to: file, options: .atomic)
     }
 
-    /// Deletes every tray item in one PhotoKit change (one system confirmation), then drops them from the tray and `library`.
-    func commit(_ library: CleanerLibrary, timeout: Duration = .seconds(60)) async -> Outcome {
-        let assets = PHAsset.fetchAssets(withLocalIdentifiers: Array(state.ids), options: nil)
+    /// Deletes the tray items in `ids` (default: all) in one PhotoKit change (one system confirmation), then drops them
+    /// from the tray and `library`.
+    func commit(_ library: CleanerLibrary, ids: Set<String>? = nil, timeout: Duration = .seconds(60)) async -> Outcome {
+        let ids = ids.map { state.ids.intersection($0) } ?? state.ids
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: Array(ids), options: nil)
         var found = Set<String>()
         assets.enumerateObjects { a, _, _ in found.insert(a.localIdentifier) }
-        let gone = state.ids.subtracting(found) // deleted elsewhere, or by a call that timed out but went through
+        let gone = ids.subtracting(found) // deleted elsewhere, or by a call that timed out but went through
         remove(gone)
         library.remove(gone)
         guard assets.count > 0 else { return .deleted(gone.count) }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Archives Tidyroll for the App Store (Release, any iOS device), checks the archive, and exports build/ios/Tidyroll.ipa
+# Archives Unhoard for the App Store (Release, any iOS device), checks the archive, and exports build/ios/Unhoard.ipa
 # signed automatically for App Store Connect. With --upload it also uploads the build for TestFlight.
 #   DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh [--upload]
 # Needs: Xcode signed in to the team (Settings > Accounts) and XcodeGen.
@@ -20,29 +20,29 @@ fail() { echo "$*" >&2; exit 1; }
 version=$(awk '/MARKETING_VERSION:/ { gsub(/"/, "", $2); print $2 }' project.yml)
 build=${BUILD_NUMBER:-$(awk '/CURRENT_PROJECT_VERSION:/ { gsub(/"/, "", $2); print $2 }' project.yml)}
 out=build/ios
-archive=$out/Tidyroll.xcarchive
-ipa=$out/Tidyroll.ipa
+archive=$out/Unhoard.xcarchive
+ipa=$out/Unhoard.ipa
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 xcodegen generate --quiet
 rm -rf "$out"
-xcodebuild archive -quiet -project Tidyroll.xcodeproj -scheme Tidyroll -configuration Release -allowProvisioningUpdates \
+xcodebuild archive -quiet -project Unhoard.xcodeproj -scheme Unhoard -configuration Release -allowProvisioningUpdates \
     -destination generic/platform=iOS -derivedDataPath build/dd-release -archivePath "$archive" \
     DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CURRENT_PROJECT_VERSION="$build"
 
-app=$archive/Products/Applications/Tidyroll.app
+app=$archive/Products/Applications/Unhoard.app
 read_plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$app/Info.plist" 2>/dev/null; }
-[ "$(read_plist CFBundleIdentifier)" = com.kleash.tidyroll ] || fail "The bundle id isn't com.kleash.tidyroll."
+[ "$(read_plist CFBundleIdentifier)" = com.kleash.unhoard ] || fail "The bundle id isn't com.kleash.unhoard."
 [ "$(read_plist CFBundleShortVersionString)" = "$version" ] || fail "CFBundleShortVersionString isn't $version."
 [ "$(read_plist CFBundleVersion)" = "$build" ] || fail "CFBundleVersion isn't $build."
 [ "$(read_plist CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName)" = AppIcon ] || fail "The app has no icon (AppIcon)."
 [ -f "$app/PrivacyInfo.xcprivacy" ] || fail "The app has no PrivacyInfo.xcprivacy."
 [ "$(read_plist ITSAppUsesNonExemptEncryption)" = false ] || fail "ITSAppUsesNonExemptEncryption isn't NO."
 [ -n "$(read_plist NSPhotoLibraryAddUsageDescription)" ] || fail "Info.plist lacks NSPhotoLibraryAddUsageDescription."
-[ -n "$(read_plist NSPhotoLibraryUsageDescription)" ] || fail "Info.plist lacks NSPhotoLibraryUsageDescription (Tidyroll reads and deletes)."
+[ -n "$(read_plist NSPhotoLibraryUsageDescription)" ] || fail "Info.plist lacks NSPhotoLibraryUsageDescription (Unhoard reads and deletes)."
 [ "$(read_plist UIDeviceFamily:0)" = 1 ] && [ -z "$(read_plist UIDeviceFamily:1)" ] || fail "The app isn't iPhone-only."
-[ "$(lipo -archs "$app/Tidyroll")" = arm64 ] || fail "The app isn't arm64 alone."
+[ "$(lipo -archs "$app/Unhoard")" = arm64 ] || fail "The app isn't arm64 alone."
 
 export_options() { # $1: export or upload
     cat > "$work/ExportOptions.plist" <<PLIST
@@ -69,11 +69,11 @@ xcodebuild -exportArchive -archivePath "$archive" -exportPath "$out" -exportOpti
     -allowProvisioningUpdates
 [ -f "$ipa" ] || fail "The export made no $ipa."
 unzip -q "$ipa" -d "$work/ipa"
-codesign --verify --deep --strict "$work/ipa/Payload/Tidyroll.app"
-codesign -d --entitlements - --xml "$work/ipa/Payload/Tidyroll.app" 2>/dev/null > "$work/signed.plist"
+codesign --verify --deep --strict "$work/ipa/Payload/Unhoard.app"
+codesign -d --entitlements - --xml "$work/ipa/Payload/Unhoard.app" 2>/dev/null > "$work/signed.plist"
 entitlement() { /usr/libexec/PlistBuddy -c "Print :$1" "$work/signed.plist" 2>/dev/null; }
-[ "$(entitlement application-identifier)" = "$DEVELOPMENT_TEAM.com.kleash.tidyroll" ] \
-    || fail "The export is signed for $(entitlement application-identifier), not $DEVELOPMENT_TEAM.com.kleash.tidyroll."
+[ "$(entitlement application-identifier)" = "$DEVELOPMENT_TEAM.com.kleash.unhoard" ] \
+    || fail "The export is signed for $(entitlement application-identifier), not $DEVELOPMENT_TEAM.com.kleash.unhoard."
 [ "$(entitlement get-task-allow)" != true ] || fail "The export is signed for development (get-task-allow)."
 echo "Exported $ipa (version $version, build $build)."
 

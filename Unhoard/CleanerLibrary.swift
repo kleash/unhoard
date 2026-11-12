@@ -43,6 +43,9 @@ struct AssetRecord: Codable, Hashable, Identifiable {
     /// AI second opinion: "memory", "utility" or "accident", with a one-line reason.
     var aiLabel: String?
     var aiReason: String?
+    /// Claude's Similar-shots opinion: "keep" or "duplicate", with a one-line reason.
+    var similarLabel: String?
+    var similarReason: String?
 
     var isVideo: Bool { mediaType == PHAssetMediaType.video.rawValue }
     var isPhoto: Bool { mediaType == PHAssetMediaType.image.rawValue }
@@ -69,6 +72,8 @@ struct AssetRecord: Codable, Hashable, Identifiable {
         similarToPrev = old.similarToPrev
         aiLabel = old.aiLabel
         aiReason = old.aiReason
+        similarLabel = old.similarLabel
+        similarReason = old.similarReason
     }
 }
 
@@ -224,6 +229,7 @@ enum CleanupCategory: String, CaseIterable, Identifiable, Codable {
         case .chats: r.chatApp
         case .sensitive: r.sensitive
         case .utility: r.aiLabel?.capitalized
+        case .similar: r.similarLabel.map { "Claude: \($0)" }
         default: nil
         }
     }
@@ -244,6 +250,22 @@ struct ScanCache: Codable {
     var token: Data?
     /// True when Vision's aesthetics request can't run here (the simulator, say), as of the last scan.
     var aestheticsUnsupported: Bool?
+    /// The version of the detection rules the records were made with; nil in caches from before rules were versioned.
+    var rules: Int? = ScanCache.currentRules
+
+    /// 2: stricter "ID with photo", Similar distance 0.35 → 0.15.
+    static let currentRules = 2
+
+    /// Clears what older rules decided, so the next scan redoes just that (keeps everything else).
+    mutating func upgradeRules() {
+        guard (rules ?? 1) < Self.currentRules else { return }
+        for id in records.keys {
+            if records[id]!.sensitive == "ID with photo" { records[id]!.sensitive = nil }
+            records[id]!.similarPrev = nil
+            records[id]!.similarToPrev = nil
+        }
+        rules = Self.currentRules
+    }
 
     static func load(_ url: URL) -> ScanCache? {
         (try? Data(contentsOf: url)).flatMap { try? PropertyListDecoder().decode(ScanCache.self, from: $0) }
@@ -355,12 +377,13 @@ enum LibraryScanner {
     }
 
     /// "Scanning 13% · 1,234 of 9,876 · about 2 min left" (the estimate once there's enough to go on).
-    static func progressText(_ verb: String, _ done: Int, _ total: Int, since start: Date) -> String {
+    /// `resumedAt` is how many were already done when this run started (the estimate uses only this run's pace).
+    static func progressText(_ verb: String, _ done: Int, _ total: Int, since start: Date, resumedAt: Int = 0) -> String {
         let f = Double(done) / Double(max(total, 1))
         var text = "\(verb) \(Int(f * 100))% · \(done.formatted()) of \(total.formatted())"
-        let elapsed = Date().timeIntervalSince(start)
-        if f > 0.01, elapsed > 2 {
-            let left = Duration.seconds(elapsed * (1 - f) / f)
+        let elapsed = Date().timeIntervalSince(start), thisRun = done - resumedAt
+        if Double(thisRun) / Double(max(total - resumedAt, 1)) > 0.01, elapsed > 2 {
+            let left = Duration.seconds(elapsed * Double(total - done) / Double(thisRun))
             text += " · about \(left.formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 1))) left"
         }
         return text
@@ -411,10 +434,23 @@ enum LibraryScanner {
     @ObservationIgnored var continuedTask: BGTask? // iOS 26+: the system's progress UI for this scan
     @ObservationIgnored private var deleted = Set<String>() // so a scan that started before a delete doesn't bring items back
     @ObservationIgnored let file: URL
+    /// The detection rules changed since the cache was made: what they pre-selected should be offered afresh.
+    @ObservationIgnored var rulesChanged = false
+    /// Claude's Similar-shots run (see `askClaude`): groups done of total while it goes, and why it stopped if it failed.
+    var similarRun: (done: Int, total: Int)?
+    var similarError: String?
+    @ObservationIgnored var similarTask: Task<Void, Never>?
 
-    init(file: URL = URL.applicationSupportDirectory.appending(path: "Tidyroll/library.plist")) {
+    init(file: URL = URL.applicationSupportDirectory.appending(path: "Unhoard/library.plist")) {
         self.file = file
-        if let cache = ScanCache.load(file) { apply(cache, CleanupCategory.sections(cache.records.values)) }
+        if var cache = ScanCache.load(file) {
+            if (cache.rules ?? 1) < ScanCache.currentRules {
+                cache.upgradeRules()
+                cache.save(to: file)
+                rulesChanged = true
+            }
+            apply(cache, CleanupCategory.sections(cache.records.values))
+        }
     }
 
     var hasCompletedScan: Bool { token != nil }
@@ -429,7 +465,7 @@ enum LibraryScanner {
     func scan() async {
         if let running { return await running.value }
         let start = ScanCache(records: records, token: token, aestheticsUnsupported: aestheticsUnsupported), file = file
-        let finishBackground = keepScanAlive(long: token == nil)
+        let finishBackground = keepScanAlive(long: isUnfinished)
         let worker = Task.detached(priority: .userInitiated) {
             await LibraryScanner.scan(start, checkpoint: { cache in
                 cache.save(to: file)
@@ -468,11 +504,16 @@ enum LibraryScanner {
         save()
     }
 
-    /// Stores AI second opinions (id → label and reason). Callers wait for a running scan to end, which would overwrite them.
-    func setOpinions(_ opinions: [String: (label: String, reason: String)]) {
+    /// Stores AI second opinions (id → label and reason): Utility ones, or Claude's Similar-shots ones when `similar`.
+    func setOpinions(_ opinions: [String: (label: String, reason: String)], similar: Bool = false) {
         for (id, o) in opinions where records[id] != nil {
-            records[id]!.aiLabel = o.label
-            records[id]!.aiReason = o.reason
+            if similar {
+                records[id]!.similarLabel = o.label
+                records[id]!.similarReason = o.reason
+            } else {
+                records[id]!.aiLabel = o.label
+                records[id]!.aiReason = o.reason
+            }
         }
         sections = CleanupCategory.sections(records.values)
         save()
@@ -485,9 +526,10 @@ enum LibraryScanner {
         // AI opinions arrive while a scan may be running from an older copy of the records: keep them over it.
         var incoming = cache.records
         var kept = false
-        for (id, old) in records where old.aiLabel != nil && incoming[id]?.aiLabel == nil && incoming[id]?.modified == old.modified {
-            incoming[id]!.aiLabel = old.aiLabel
-            incoming[id]!.aiReason = old.aiReason
+        for (id, old) in records where incoming[id] != nil && incoming[id]?.modified == old.modified
+            && (old.aiLabel != nil && incoming[id]?.aiLabel == nil || old.similarLabel != nil && incoming[id]?.similarLabel == nil) {
+            if incoming[id]!.aiLabel == nil { (incoming[id]!.aiLabel, incoming[id]!.aiReason) = (old.aiLabel, old.aiReason) }
+            if incoming[id]!.similarLabel == nil { (incoming[id]!.similarLabel, incoming[id]!.similarReason) = (old.similarLabel, old.similarReason) }
             kept = true
         }
         let fresh = incoming.values.lazy.filter { r in

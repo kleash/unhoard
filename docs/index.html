@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unhoard – Swipe Photo Cleaner for iPhone</title>
+<meta name="description" content="Unhoard finds screenshots, similar shots, blurry photos, large videos and accidental clips on your iPhone, and lets you clear them with a swipe. Free, open source, and everything runs on your iPhone.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <nav><a href="./">Unhoard</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/kleash/unhoard">GitHub</a></nav>
+</header>
+<main>
+  <h1>Unhoard</h1>
+  <p class="lead">Clear screenshots, blurry photos, similar shots and big videos off your iPhone with a swipe. Free, open source and private: everything runs on your iPhone.</p>
+
+  <!-- TODO: replace with the App Store link (https://apps.apple.com/app/id...) once the app is live. -->
+  <p><span class="button">Coming soon to the App Store</span></p>
+  <p>Unhoard is free, with no ads, no subscription and no account. iPhone, iOS 18 or later.</p>
+
+  <h2>What it finds</h2>
+  <ul>
+    <li><strong>Screenshots &amp; screen recordings</strong>, oldest first.</li>
+    <li><strong>Similar shots</strong>: photos taken within two minutes that look alike, grouped, with the best one marked.</li>
+    <li><strong>Blurry photos</strong> with nothing in focus. Night shots are left out.</li>
+    <li><strong>Utility shots</strong>: receipts, labels, whiteboards and other photos taken to remember a thing, not a moment.</li>
+    <li><strong>Large videos</strong> over 50 MB, biggest first.</li>
+    <li><strong>Accidental clips</strong>: very short clips that are dark or one flat colour (lens covered, phone in a pocket).</li>
+    <li><strong>Short moments</strong>: other clips under 3 seconds. <em>Make Still</em> keeps the sharpest frame as a photo.</li>
+    <li><strong>Saved from apps</strong>: media that chat and social apps saved to your library, labelled with the app.</li>
+    <li><strong>Sensitive photos</strong>: passports, IDs, cards, passwords and Wi-Fi labels. Move them to the locked Hidden album, or delete them one by one.</li>
+  </ul>
+  <p>Each category shows how many items it holds and how much space they take. Exact duplicates are left to the Duplicates album in Apple Photos.</p>
+
+  <h2>How you clean</h2>
+  <ul>
+    <li><strong>Swipe</strong> through a stack of cards: left to delete, right to keep, with Undo.</li>
+    <li><strong>Grid</strong>: tap to select, drag sideways to select a range, long-press to preview.</li>
+    <li><strong>Compare</strong> similar shots two at a time, zooming both together.</li>
+    <li><strong>Delete tray</strong>: everything you pick waits in one tray, and goes in one step when you're ready.</li>
+    <li><strong>Memory guard</strong>: favourites, edited photos and photos in your own albums are never selected for you.</li>
+  </ul>
+  <p>Deleted items go to <strong>Recently Deleted</strong> in Photos and stay there for 30 days, so you can change your mind. See <a href="support.html#storage">how to get the space back now</a>.</p>
+
+  <h2>Private by design</h2>
+  <div class="card">
+    <p>Unhoard scans your library on your iPhone. There are no accounts, ads, analytics or tracking, and the developer collects nothing.</p>
+    <p>The one optional exception is a <strong>second opinion from Claude</strong> on borderline photos. You bring your own Anthropic API key, and a consent sheet shows the exact small previews (512 px at most, with no location, dates or camera details) before anything is sent. Sensitive and hidden photos are never sent. On iPhones with Apple Intelligence, a second opinion can run on the iPhone instead.</p>
+    <p>Read the <a href="privacy.html">privacy policy</a>, or <a href="support.html#verify">check it yourself</a> with App Privacy Report.</p>
+  </div>
+
+  <h2>Open source</h2>
+  <p>Unhoard is MIT-licensed. Read the code, report a bug or suggest an idea on <a href="https://github.com/kleash/unhoard">GitHub</a>.</p>
+</main>
+<footer>
+  <p><a href="support.html">Support</a> · <a href="privacy.html">Privacy</a> · <a href="https://github.com/kleash/unhoard">Source code</a> · MIT License</p>
+</footer>
+</body>
+</html>

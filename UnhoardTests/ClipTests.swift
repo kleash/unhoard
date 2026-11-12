@@ -2,7 +2,7 @@ import AVFoundation
 import CoreImage
 import Photos
 import XCTest
-@testable import Tidyroll
+@testable import Unhoard
 
 final class ClipTests: XCTestCase {
     private let context = CIContext()

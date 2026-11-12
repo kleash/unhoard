@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unhoard Privacy Policy</title>
+<meta name="description" content="Unhoard's privacy policy: the developer collects no data. Everything runs on your iPhone, except an optional second opinion from Claude with your own key.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <nav><a href="./">Unhoard</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="https://github.com/kleash/unhoard">GitHub</a></nav>
+</header>
+<main>
+  <h1>Privacy Policy</h1>
+  <p class="lead">Effective 12 November 2026. Applies to Unhoard for iPhone, version 1.0.0 and later.</p>
+
+  <div class="card">
+    <p><strong>In short:</strong> the developer of Unhoard collects no data about you. Unhoard has no accounts, ads, analytics, tracking or third-party SDKs, and it runs on your iPhone. The only time it sends anything over the network is when you choose to ask Claude for a second opinion, with your own Anthropic API key, after you have seen exactly what will be sent.</p>
+  </div>
+
+  <h2>What the developer collects</h2>
+  <p>Nothing. Unhoard has no server. The developer never receives your photos, your library details, your usage or any identifier for you or your device.</p>
+
+  <h2>Photos access</h2>
+  <p>Unhoard asks for:</p>
+  <ul>
+    <li><strong>Full access to your photo library</strong>, to find screenshots, similar, blurry and utility shots, large videos and short clips, and to delete the items you choose. Every delete is one request you confirm in the iOS dialog. Deleted items go to Recently Deleted in Photos for 30 days.</li>
+    <li><strong>Permission to add photos</strong>, to save the still photos you make from short clips with <em>Make Still</em>.</li>
+  </ul>
+  <p>Photo analysis uses Apple's Vision framework on small thumbnails, on your iPhone. If your library is in iCloud Photos, iOS may download an original from iCloud when you preview it or when a short clip is checked. That download is between your iPhone and Apple's iCloud, under Apple's terms; nothing is sent to the developer.</p>
+
+  <h2>What stays on your iPhone</h2>
+  <ul>
+    <li>A scan cache (which items fall in which category), so later scans only read what changed.</li>
+    <li>Your delete tray, so it survives a relaunch.</li>
+    <li>A small history of how much you have cleared, for the History chart.</li>
+    <li>Your Anthropic API key, if you add one, stored in the iOS Keychain.</li>
+  </ul>
+  <p>The cache, tray and history are deleted when you delete the app. iOS can keep Keychain items after an app is deleted, so remove your key first with <em>Remove Key</em> in Second Opinion Settings (you can also revoke it any time in your Anthropic console).</p>
+
+  <h2>Optional: a second opinion from Claude</h2>
+  <p>For borderline photos, you can ask Claude, an AI model made by Anthropic, whether each is a memory, a utility shot or an accident. This is off until you add your own Anthropic API key, and Unhoard works fully without it.</p>
+  <ul>
+    <li>Before anything is sent, a consent sheet shows the exact previews that will go. Nothing is sent until you confirm.</li>
+    <li>Previews are redrawn from pixels as JPEGs of at most 512 pixels. They carry no location, dates or camera details.</li>
+    <li>Photos marked sensitive (IDs, cards, passwords and similar) and photos in your Hidden album are never sent.</li>
+    <li>The previews go from your iPhone straight to Anthropic's API (<code>api.anthropic.com</code>), under your own API key and account. They do not pass through any server of the developer, and the developer cannot see them.</li>
+    <li>Anthropic handles that data under its own terms and privacy policy, which you agreed to when you created your API key: see <a href="https://www.anthropic.com/legal/privacy">anthropic.com/legal/privacy</a>. Requests are billed to your Anthropic account.</li>
+    <li>Claude only returns a label and a one-line reason. It never deletes or selects anything.</li>
+  </ul>
+  <p>On iPhones with Apple Intelligence (iOS 27), the second opinion can run on the iPhone with Apple's on-device model instead, and then nothing is sent anywhere.</p>
+
+  <h2>Children</h2>
+  <p>Unhoard collects no data from anyone, including children.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version will be posted on this page with a new effective date. Every past version is in the <a href="https://github.com/kleash/unhoard/commits/main/docs/privacy.html">public history</a>.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy: open an issue at <a href="https://github.com/kleash/unhoard/issues">github.com/kleash/unhoard/issues</a>. Issues are public, so please don't include personal details or photos.</p>
+</main>
+<footer>
+  <p><a href="./">Home</a> · <a href="support.html">Support</a> · <a href="https://github.com/kleash/unhoard">Source code</a> · MIT License</p>
+</footer>
+</body>
+</html>

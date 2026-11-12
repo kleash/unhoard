@@ -37,17 +37,30 @@ enum PhotoAnalysis {
         let aesthetics = await aestheticsScore(probe) != nil
         cache.aestheticsUnsupported = !aesthetics
         let photos = cache.records.values.filter(\.isPhoto).sorted { ($0.created ?? .distantPast, $0.id) < ($1.created ?? .distantPast, $1.id) }
-        let todo = photos.filter { needsWork($0, aesthetics: aesthetics) }.map(\.id)
+        let todo = photos.filter { needsWork($0, aesthetics: aesthetics) }
+        let doneBefore = photos.count - todo.count // progress counts the whole library, so a resumed scan carries on from there
         var lastSave = Date()
         var started = Date()
-        for (n, id) in todo.enumerated() {
-            if Task.isCancelled { break }
-            if n % 10 == 0 { await progress(LibraryScanner.progressText("Analysing photos", n, todo.count, since: started), Double(n) / Double(todo.count)) }
-            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject,
-                  let image = await thumbnail(asset, side: analysisSide), var r = cache.records[id] else { continue } // retried next scan
-            await analyse(&r, image: image, asset: asset, aesthetics: aesthetics)
-            cache.records[id] = r
-            if Date().timeIntervalSince(lastSave) > LibraryScanner.checkpointInterval { await checkpoint(cache); lastSave = Date() }
+        await withTaskGroup(of: AssetRecord?.self) { group in
+            var next = 0, n = 0
+            func feed() {
+                guard next < todo.count, !Task.isCancelled else { return }
+                let r = todo[next]
+                next += 1
+                group.addTask { await analysed(r, aesthetics: aesthetics) }
+            }
+            for _ in 0..<parallel { feed() } // the Neural Engine and thumbnail decoding overlap, so a few at once is faster
+            while let result = await group.next() {
+                n += 1
+                if let r = result { cache.records[r.id] = r } // nil: no local thumbnail, retried next scan
+                if n % 10 == 0 {
+                    let done = doneBefore + n
+                    await progress(LibraryScanner.progressText("Analysing photos", done, photos.count, since: started, resumedAt: doneBefore),
+                                   Double(done) / Double(photos.count))
+                }
+                if Date().timeIntervalSince(lastSave) > LibraryScanner.checkpointInterval { await checkpoint(cache); lastSave = Date() }
+                feed()
+            }
         }
         await checkpoint(cache)
 
@@ -79,6 +92,22 @@ enum PhotoAnalysis {
             }
         })
         await checkpoint(cache)
+    }
+
+    #if targetEnvironment(simulator)
+    // shortcut: the simulator's text recognition crashed (EXC_BAD_ACCESS in TextRecognition) with 4 at once; the iPhone hasn't. One at a time there.
+    static let parallel = 1
+    #else
+    static let parallel = 4
+    #endif
+
+    /// `r` with its analysis filled in, or nil when its thumbnail isn't on the device.
+    static func analysed(_ r: AssetRecord, aesthetics: Bool) async -> AssetRecord? {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [r.id], options: nil).firstObject,
+              let image = await thumbnail(asset, side: analysisSide) else { return nil }
+        var r = r
+        await analyse(&r, image: image, asset: asset, aesthetics: aesthetics)
+        return r
     }
 
     /// Fills in whatever `r` is missing from one thumbnail (plus a 1024 px one for the sensitive check's text).
@@ -118,17 +147,20 @@ enum PhotoAnalysis {
         let codes = (try? await DetectBarcodesRequest().perform(on: image)) ?? []
         let idBarcode = codes.contains { [.pdf417, .microPDF417, .aztec].contains($0.symbology) } // licences, ID cards, boarding passes
         if let why = SensitiveRules.reason(lines: lines, barcodes: codes.compactMap(\.payloadString), idBarcode: idBarcode) { return why }
-        // A document with a small face printed on it: an ID card or a passport's photo page.
-        guard let doc = (try? await DetectDocumentSegmentationRequest().perform(on: image)) ?? nil else { return "" }
-        let corners = [doc.topLeft, doc.topRight, doc.bottomLeft, doc.bottomRight].map(\.cgPoint)
+        // A document with one small face printed on it: an ID card or a passport's photo page. Walls, posters and shop fronts
+        // also segment as documents, so the quad must be confident, ID-shaped (ID-1 1.59, passport page 1.42), not the whole
+        // frame, carry text, and hold exactly one face (on the author's library: 78 false alarms to 0, both real IDs kept).
+        guard let doc = (try? await DetectDocumentSegmentationRequest().perform(on: image)) ?? nil, doc.confidence >= 0.7 else { return "" }
+        let corners = [doc.topLeft, doc.topRight, doc.bottomRight, doc.bottomLeft].map(\.cgPoint)
         let box = CGRect(x: corners.map(\.x).min()!, y: corners.map(\.y).min()!, width: 0, height: 0)
             .union(CGRect(origin: CGPoint(x: corners.map(\.x).max()!, y: corners.map(\.y).max()!), size: .zero))
-        let faces = (try? await DetectFaceRectanglesRequest().perform(on: image)) ?? []
-        let onCard = faces.contains { f in
-            let r = f.boundingBox.cgRect
-            return box.contains(CGPoint(x: r.midX, y: r.midY)) && r.width * r.height < 0.25 * box.width * box.height
-        }
-        return onCard ? "ID with photo" : ""
+        func side(_ a: CGPoint, _ b: CGPoint) -> CGFloat { hypot((a.x - b.x) * CGFloat(image.width), (a.y - b.y) * CGFloat(image.height)) }
+        let w = side(corners[0], corners[1]) + side(corners[3], corners[2]), h = side(corners[0], corners[3]) + side(corners[1], corners[2])
+        let textOnCard = observations.filter { box.contains(CGPoint(x: $0.boundingBox.cgRect.midX, y: $0.boundingBox.cgRect.midY)) }.count
+        guard (1.3...1.7).contains(max(w, h) / max(1, min(w, h))), box.width * box.height < 0.95, textOnCard >= 3 else { return "" }
+        let faces = ((try? await DetectFaceRectanglesRequest().perform(on: image)) ?? []).map { $0.boundingBox.cgRect } // a closure: the key path needs an iOS 27+ setter
+            .filter { box.contains(CGPoint(x: $0.midX, y: $0.midY)) }
+        return faces.count == 1 && faces[0].width * faces[0].height < 0.25 * box.width * box.height ? "ID with photo" : ""
     }
 
     /// Sharpness and brightness on a grey copy scaled to fit 512 px, so thumbnails of any size compare. Sharpness is the
@@ -173,7 +205,7 @@ enum PhotoAnalysis {
 
     #if DEBUG
     /// The UI walkthrough's stand-ins for what the simulator can't run (aesthetics, feature prints). Debug builds only.
-    static let standIns = ProcessInfo.processInfo.arguments.contains("-TidyrollSimulatorStandIns")
+    static let standIns = ProcessInfo.processInfo.arguments.contains("-UnhoardSimulatorStandIns")
 
     /// Mean grey difference of 16 px copies, scaled so the same picture re-shot measures well under `distanceBelow`.
     static func standInDistance(_ a: AssetRecord, _ b: AssetRecord) async -> Double? {
@@ -280,10 +312,10 @@ enum SensitiveRules {
 enum SimilarShots {
     /// At most this long after the previous photo.
     static let within: TimeInterval = 120
-    /// Feature-print distance below this looks alike. On sample pictures, the same scene shifted, cropped 4%, rotated or
-    /// re-exposed measured 0.002–0.3 (median 0.08); different pictures 0.27–1.66 (median 0.72), the closest being
-    /// light/dark variants of one design. shortcut: tuned on sample pictures, not a real library; raise it if groups split.
-    static let distanceBelow = 0.35
+    /// Feature-print distance below this looks alike. Calibrated on a real 6,900-photo library (512 px, pairs ≤ 120 s apart):
+    /// below 0.10 nearly every pair is a re-take of one shot, 0.10–0.15 most, 0.15–0.20 about half, above 0.20 mostly a
+    /// different pose, person or framing at the same spot. 0.35 (from sample pictures) linked 46% of that library.
+    static let distanceBelow = 0.15
 
     /// Brings each photo's link to the one before it (in `photos`, oldest first) up to date; only stale links are redone.
     /// `distance` is nil when a thumbnail isn't on the device (that link is retried next scan).

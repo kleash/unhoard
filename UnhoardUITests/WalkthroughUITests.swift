@@ -1,10 +1,10 @@
 import XCTest
 
 /// One walkthrough on the simulator's library (add media with `simctl addmedia` first); screenshots go to the test
-/// report and /tmp/tidyroll-shots/design/. It never confirms a delete.
+/// report and /tmp/unhoard-shots/design/. It never confirms a delete.
 final class WalkthroughUITests: XCTestCase {
     let app = XCUIApplication()
-    let shotDir = URL(fileURLWithPath: "/tmp/tidyroll-shots/design")
+    let shotDir = URL(fileURLWithPath: "/tmp/unhoard-shots/design")
     var step = 0
 
     func shot(_ name: String) {
@@ -20,6 +20,8 @@ final class WalkthroughUITests: XCTestCase {
     }
 
     func el(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+    /// The previewed item's id (dates can repeat).
+    var previewItem: String { app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'preview-'")).firstMatch.identifier }
     var cells: XCUIElementQuery { app.descendants(matching: .any).matching(identifier: "assetCell") }
     /// The tray count from the floating Delete button ("Delete 3 items, …"), 0 when it's hidden.
     var trayCount: Int {
@@ -28,7 +30,7 @@ final class WalkthroughUITests: XCTestCase {
         return Int(b.label.split(separator: " ")[1]) ?? 0
     }
 
-    let dark = "-TidyrollDark" // debug builds: the screenshots' colour scheme, without changing the shared simulator's
+    let dark = "-UnhoardDark" // debug builds: the screenshots' colour scheme, without changing the shared simulator's
 
     func launch(_ arguments: String...) {
         app.terminate()
@@ -38,7 +40,7 @@ final class WalkthroughUITests: XCTestCase {
 
     /// A short run for a screen recording (scripted with `simctl io recordVideo` around it): the live scan, then the swipe stack.
     func testRecordScanAndSwipe() throws {
-        launch(dark, "-TidyrollFreshScan")
+        launch(dark, "-UnhoardFreshScan")
         if el("accessButton").waitForExistence(timeout: 3) { throw XCTSkip("Grant Photos access first (README).") }
         XCTAssertTrue(el("scanStatus").waitForExistence(timeout: 20), "a fresh scan shows the live hero")
         sleep(12)
@@ -69,13 +71,13 @@ final class WalkthroughUITests: XCTestCase {
     }
 
     func testWalkthrough() throws {
-        launch(dark, "-TidyrollOnboarding")
+        launch(dark, "-UnhoardOnboarding")
         XCTAssertTrue(el("accessButton").waitForExistence(timeout: 5))
         sleep(1)
         shot("onboarding")
 
         // A fresh scan, for the live hero; the first swipe card opens mid-drag for its screenshot.
-        launch(dark, "-TidyrollFreshScan", "-TidyrollDemoDrag")
+        launch(dark, "-UnhoardFreshScan", "-UnhoardDemoDrag")
         if el("accessButton").waitForExistence(timeout: 3) { app.terminate(); throw XCTSkip("Grant Photos access first (README).") }
         XCTAssertTrue(el("card-screenshots").waitForExistence(timeout: 10))
         if el("scanStatus").waitForExistence(timeout: 10) {
@@ -105,7 +107,8 @@ final class WalkthroughUITests: XCTestCase {
         XCTAssertEqual(trayCount, before + 1, "tap selects")
         cells.element(boundBy: 0).tap()
         XCTAssertEqual(trayCount, before, "tap again deselects")
-        if cells.count >= 3 {
+        let dragged = cells.count >= 3
+        if dragged {
             // Horizontal-first drag across the first row selects the range.
             let start = cells.element(boundBy: 0).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let end = cells.element(boundBy: 2).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
@@ -113,9 +116,16 @@ final class WalkthroughUITests: XCTestCase {
             XCTAssertEqual(trayCount, before + 3, "drag selects the cells it passes")
             sleep(1)
             shot("category-grid")
+            app.buttons["Selected"].tap()
+            XCTAssertEqual(cells.count, 3, "the Selected filter shows only tray items")
+            app.buttons["All"].tap()
         }
         cells.element(boundBy: 0).press(forDuration: 0.8)
         XCTAssertTrue(el("closePreview").waitForExistence(timeout: 5), "long-press previews")
+        let firstTitle = previewItem
+        app.swipeLeft()
+        sleep(1)
+        XCTAssertNotEqual(previewItem, firstTitle, "swiping the preview shows the next item")
         el("closePreview").tap()
 
         // The swipe stack.
@@ -134,18 +144,66 @@ final class WalkthroughUITests: XCTestCase {
         el("swipeKeep").tap()
         sleep(1)
         XCTAssertEqual(trayCount, trayBefore, "keep doesn't add")
+        app.buttons["Undo"].tap() // keeps are remembered: take it back so the next run's deck still has this item
         el("swipeDone").tap()
 
         // A pre-selecting category, then the commit sheet (closed without deleting).
         back()
+        if dragged {
+            // Long-press a card: delete just that category's selected items (closed without deleting).
+            el("card-moments").press(forDuration: 1.2)
+            let deleteCategory = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Delete' AND label ENDSWITH 'Selected'")).firstMatch
+            XCTAssertTrue(deleteCategory.waitForExistence(timeout: 5), "a card's long-press offers deleting its selected items")
+            deleteCategory.tap()
+            XCTAssertTrue(el("commitDeleteButton").waitForExistence(timeout: 5))
+            app.buttons["Close"].tap()
+            sleep(1)
+        }
         el("card-screenshots").tap()
-        sleep(2)
+        XCTAssertTrue(cells.firstMatch.waitForExistence(timeout: 10))
+        // Zoom, on a screenshot (always a photo): pinch in, then swiping down pans instead of closing.
+        cells.element(boundBy: 0).press(forDuration: 0.8)
+        XCTAssertTrue(el("closePreview").waitForExistence(timeout: 5))
+        let zoomTitle = previewItem
+        XCTAssertTrue(zoomTitle.hasPrefix("preview-"), "the preview names its item")
+        app.pinch(withScale: 3, velocity: 2)
+        sleep(1)
+        XCTAssertTrue(el("closePreview").exists, "pinching doesn't close the preview")
+        shot("preview-zoomed")
+        app.swipeDown()
+        sleep(1)
+        XCTAssertTrue(el("closePreview").exists, "swiping down while zoomed pans instead of closing")
+        if cells.count >= 2 {
+            // Zoomed in, sideways swipes pan to the edge, then the next swipe goes to the next item; back, it fits again.
+            for _ in 0..<4 where previewItem == zoomTitle { app.swipeLeft(); sleep(1) }
+            XCTAssertNotEqual(previewItem, zoomTitle, "a swipe at the zoomed photo's edge goes to the next item")
+            app.swipeRight()
+            sleep(1)
+            XCTAssertEqual(previewItem, zoomTitle)
+        } else {
+            app.doubleTap()
+            sleep(1)
+        }
+        // Fit again: double-tap zooms in (swiping down pans), double-tap again fits (swiping down closes).
+        app.doubleTap()
+        sleep(1)
+        app.swipeDown()
+        sleep(1)
+        XCTAssertTrue(el("closePreview").exists, "double-tap zooms in, and swiping down then pans")
+        app.doubleTap()
+        sleep(1)
+        app.swipeDown()
+        XCTAssertTrue(el("closePreview").waitForNonExistence(timeout: 5), "fit to screen, swiping down closes")
+        // Nothing is pre-selected here: pick one for the commit sheet, and put it back after.
+        let picked = trayCount == 0
+        if picked { cells.element(boundBy: 0).tap() }
         XCTAssertTrue(el("deleteButton").waitForExistence(timeout: 5))
         el("deleteButton").tap()
         XCTAssertTrue(el("commitDeleteButton").waitForExistence(timeout: 5))
         sleep(1)
         shot("commit-sheet")
         app.buttons["Close"].tap()
+        if picked { cells.element(boundBy: 0).tap() }
         back()
 
         // Sensitive: never bulk-selected; Hide is offered (never tapped here: it would ask to change the library).
@@ -168,14 +226,14 @@ final class WalkthroughUITests: XCTestCase {
         back()
 
         // Home in light mode (before the stand-ins below, which label most sample pictures as utility shots).
-        launch("-TidyrollLight")
+        launch("-UnhoardLight")
         XCTAssertTrue(el("card-screenshots").waitForExistence(timeout: 10))
         waitForScan()
         sleep(1)
         shot("home-light")
 
         // Relaunch with debug stand-ins for what the simulator can't run (aesthetics, feature prints).
-        launch(dark, "-TidyrollSimulatorStandIns")
+        launch(dark, "-UnhoardSimulatorStandIns")
         XCTAssertTrue(el("card-similar").waitForExistence(timeout: 10))
         waitForScan()
         el("card-similar").tap()
@@ -226,7 +284,7 @@ final class WalkthroughUITests: XCTestCase {
 
         // The celebration with sample numbers (debug), then the history (sample entries when there are none yet).
         // A few frames, since the thumbnails and confetti are over in about 4 s; the best is kept as the screenshot.
-        launch(dark, "-TidyrollCelebrationDemo")
+        launch(dark, "-UnhoardCelebrationDemo")
         for frame in 0..<6 {
             usleep(600_000)
             shot("celebration-\(frame)")

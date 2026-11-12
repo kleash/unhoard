@@ -2,7 +2,7 @@ import CoreImage
 import ImageIO
 import Photos
 import XCTest
-@testable import Tidyroll
+@testable import Unhoard
 
 final class SensitiveRulesTests: XCTestCase {
     func testPassportMRZ() {
@@ -164,7 +164,7 @@ final class SimilarTests: XCTestCase {
         let photos = [photo("a", at: 0), photo("b", at: 30), photo("c", at: 100), // alike, each within 2 minutes of the last
                       photo("d", at: 1000),                                       // alike but much later
                       photo("e", at: 1010), photo("f", at: 1020)]                 // close in time, different picture
-        let vectors: [String: [Double]] = ["a": [0, 0], "b": [0.1, 0], "c": [0.2, 0.1], "d": [0.2, 0.1], "e": [3, 0], "f": [3.1, 0.1]]
+        let vectors: [String: [Double]] = ["a": [0, 0], "b": [0.1, 0], "c": [0.12, 0.05], "d": [0.12, 0.05], "e": [3, 0], "f": [3.1, 0.1]]
         let (linked, updates) = await link(photos, vectors)
         XCTAssertEqual(updates, 6)
         XCTAssertEqual(SimilarShots.groups(linked).map { Set($0.map(\.id)) }, [["e", "f"], ["a", "b", "c"]], "newest group first")
@@ -316,4 +316,68 @@ final class SecondOpinionTests: XCTestCase {
             _ = SecondOpinion.appleUnavailableReason
         }
     }
+}
+
+final class SimilarOpinionTests: XCTestCase {
+    func testGroupsArePackedWholeIntoBatches() {
+        func group(_ name: String, _ n: Int) -> [AssetRecord] { (0..<n).map { rec("\(name)\($0)") } }
+        var secret = rec("secret")
+        secret.sensitive = "Passport or ID"
+        let big = group("big", 25), a = group("a", 8), b = group("b", 8), c = group("c", 6)
+        let batches = SecondOpinion.batches([a, b, big, c, [rec("solo"), secret]])
+        XCTAssertEqual(batches.map { $0.map(\.count) }, [[8, 8], [20], [6]], "whole groups up to 20 photos; a pair with a sensitive photo isn't sent")
+        XCTAssertEqual(batches[1][0].map(\.id), big.prefix(20).map(\.id), "a big group goes alone, its first 20")
+    }
+
+    func testRequestNamesTheGroupsAndAnswersMapBackToPhotos() throws {
+        let one = [rec("ID-A/1"), rec("ID-A/2")], two = [rec("ID-B/1"), rec("ID-B/2"), rec("ID-B/3")]
+        let items = (one + two).map { (record: $0, jpeg: Data([0xFF, 0xD8])) }
+        let (request, sent) = try SecondOpinion.claudeRequest(items, apiKey: "k", system: SecondOpinion.similarInstructions,
+                                                               labels: SecondOpinion.similarLabels) { SecondOpinion.similarPrompt($0, groups: [one, two]) }
+        let raw = String(decoding: request.httpBody!, as: UTF8.self)
+        XCTAssertTrue(raw.contains("group 1 is photos 1, 2; group 2 is photos 3, 4, 5"))
+        XCTAssertTrue(raw.contains("\"duplicate\"") && !raw.contains("\"accident\""), "the Similar labels, not the Utility ones")
+        XCTAssertFalse(raw.contains("ID-"), "no library identifiers leave the device")
+
+        let text = #"{"results":[{"id":"2","label":"duplicate","reason":"Same shot, eyes closed."},{"id":"1","label":"keep","reason":"Sharpest, everyone smiling."},{"id":"9","label":"keep","reason":"?"},{"id":"3","label":"memory","reason":"?"}]}"#
+        let response = try JSONSerialization.data(withJSONObject: ["stop_reason": "end_turn", "content": [["type": "text", "text": text]]] as [String: Any])
+        let verdicts = try SecondOpinion.parse(response, status: 200, apiKey: "k", labels: SecondOpinion.similarLabels)
+        let opinions = SecondOpinion.opinions(verdicts, sent: sent)
+        XCTAssertEqual(opinions.mapValues { $0.label }, ["ID-A/1": "keep", "ID-A/2": "duplicate"], "unknown ids and labels are dropped")
+        XCTAssertEqual(opinions["ID-A/2"]?.reason, "Same shot, eyes closed.")
+    }
+
+    func testOverloadedAndRateLimitedAreRetried() async throws {
+        let ok = try JSONSerialization.data(withJSONObject: ["stop_reason": "end_turn",
+                                                             "content": [["type": "text", "text": #"{"results":[{"id":"1","label":"keep","reason":"Best."}]}"#]]] as [String: Any])
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [StubAPI.self]
+        let session = URLSession(configuration: config), request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!)
+        StubAPI.responses = [(529, Data()), (429, Data()), (200, ok)]
+        let verdicts = try await SecondOpinion.claudeVerdicts(request, labels: SecondOpinion.similarLabels, retries: 4, session: session)
+        XCTAssertEqual(verdicts.map(\.label), ["keep"])
+        XCTAssertTrue(StubAPI.responses.isEmpty)
+        StubAPI.responses = [(429, Data())]
+        do {
+            _ = try await SecondOpinion.claudeVerdicts(request, session: session)
+            XCTFail("no retries by default (Utility)")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, "Rate limited, try again shortly")
+        }
+    }
+}
+
+/// Canned API answers, in order, with retry-after 0 so retries don't wait.
+final class StubAPI: URLProtocol {
+    static var responses: [(Int, Data)] = []
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let (status, data) = Self.responses.removeFirst()
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["retry-after": "0"])!,
+                            cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

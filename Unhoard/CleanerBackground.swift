@@ -19,7 +19,7 @@ enum CleanerBackground {
                 // Launched in the background, no UI: a library of its own on the same cache file.
                 // shortcut: if the user opens the app meanwhile, its scan runs alongside; both write whole, valid caches.
                 let library = CleanerLibrary()
-                task.expirationHandler = { MainActor.assumeIsolated { library.stopScan() } }
+                task.expirationHandler = { Task { @MainActor in library.stopScan() } } // called on a background queue
                 Task {
                     await library.scan()
                     task.setTaskCompleted(success: !library.isUnfinished)
@@ -38,11 +38,13 @@ extension CleanerLibrary {
         let app = UIApplication.shared
         var assertion = UIBackgroundTaskIdentifier.invalid
         assertion = app.beginBackgroundTask(withName: "Library scan") { [weak self] in
-            self?.stopScan() // the scanner saves on its way out; checkpoints every 3 s cover a hard stop
+            // iOS 26's continued-processing task outlives this assertion and has its own expiry; otherwise stop now. The
+            // scanner saves on its way out; checkpoints every 3 s cover a hard stop.
+            if self?.continuedTask == nil { self?.stopScan() }
             app.endBackgroundTask(assertion)
             assertion = .invalid
         }
-        if long, app.applicationState == .active, #available(iOS 26.0, *) { submitContinuedScan() }
+        if long, app.applicationState != .background, #available(iOS 26.0, *) { submitContinuedScan() } // at launch the app is still .inactive
         scheduleOvernightScan(true)
         return { [weak self] finished in
             if #available(iOS 26.0, *), let task = self?.continuedTask as? BGContinuedProcessingTask {
@@ -72,7 +74,7 @@ extension CleanerLibrary {
                 guard let task = task as? BGContinuedProcessingTask else { return }
                 guard let self, self.isScanning else { return task.setTaskCompleted(success: true) }
                 task.progress.totalUnitCount = 1000
-                task.expirationHandler = { [weak self] in MainActor.assumeIsolated { self?.stopScan() } }
+                task.expirationHandler = { [weak self] in Task { @MainActor in self?.stopScan() } } // called on a background queue
                 self.continuedTask = task
             }
         }

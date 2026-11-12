@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A stack of cards, one item at a time: swipe left (or Delete) to put it in the tray, right (or Keep) to keep it; Undo steps back.
-/// shortcut: "kept" isn't remembered, so a new session starts again at the first item not in the tray; persist if asked.
+/// Keeps are remembered in the tray's file, so callers open the deck on `tray.unswiped(_:)` and kept items don't come back.
 struct SwipeReviewView: View {
     /// Fixed when the deck opens: the caller's list changes as items go to the tray.
     @State private var items: [AssetRecord]
@@ -53,7 +53,7 @@ struct SwipeReviewView: View {
                     Button("Undo", systemImage: "arrow.uturn.backward", action: undo).disabled(history.isEmpty)
                 }
             }
-            .safeAreaInset(edge: .bottom) { DeleteButton() }
+            .safeAreaInset(edge: .bottom) { DeleteButton(scope: Set(items.map(\.id))) }
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: history.count)
         .sensoryFeedback(.selection, trigger: armed)
@@ -66,7 +66,7 @@ struct SwipeReviewView: View {
         return HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(bytes.formatted(.byteCount(style: .file, spellsOutZero: false))).cleanerNumber(.title)
-                Text("freed when you delete").font(.caption).foregroundStyle(.secondary)
+                Text("cleared when you delete").font(.caption).foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
             Spacer()
@@ -176,7 +176,7 @@ struct SwipeReviewView: View {
     private func decide(trayed: Bool) {
         guard !deciding, index < items.count else { return }
         deciding = true
-        if trayed { tray.add([items[index].id]) }
+        if trayed { tray.add([items[index].id]) } else { tray.keep([items[index].id]) }
         let fling = Duration.milliseconds(reduceMotion ? 0 : 250)
         withAnimation(.easeIn(duration: reduceMotion ? 0 : 0.25)) {
             offset = CGSize(width: trayed ? -700 : 700, height: offset.height + 60)
@@ -200,7 +200,7 @@ struct SwipeReviewView: View {
     /// The last card comes back from the side it left by, with a bounce.
     private func undo() {
         guard let last = history.popLast() else { return }
-        if last.trayed { tray.remove([items[last.index].id]) }
+        if last.trayed { tray.remove([items[last.index].id]) } else { tray.unkeep([items[last.index].id]) }
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {

@@ -1,4 +1,4 @@
-name: Tidyroll
+name: Unhoard
 options:
   bundleIdPrefix: com.kleash
   deploymentTarget:
@@ -8,12 +8,12 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "5.0"
 targets:
-  Tidyroll:
+  Unhoard:
     type: application
     platform: iOS
-    sources: [Tidyroll]
+    sources: [Unhoard]
     info:
-      path: Tidyroll/Info.plist # merged with the generated keys below
+      path: Unhoard/Info.plist # merged with the generated keys below
       properties:
         BGTaskSchedulerPermittedIdentifiers:
           - $(PRODUCT_BUNDLE_IDENTIFIER).scan.*
@@ -21,52 +21,52 @@ targets:
         UIBackgroundModes: [processing]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.tidyroll
+        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.unhoard
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_CFBundleDisplayName: Tidyroll
+        INFOPLIST_KEY_CFBundleDisplayName: Unhoard
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Tidyroll looks through your photo library on this iPhone to find screenshots, similar and blurry shots, large videos and accidental clips, and deletes only the items you choose. Nothing leaves your iPhone unless you ask Claude for a second opinion.
-        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Tidyroll saves the still photos you make from short clips to your photo library.
-  TidyrollTests:
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Unhoard looks through your photo library on this iPhone to find screenshots, similar and blurry shots, large videos and accidental clips, and deletes only the items you choose. Nothing leaves your iPhone unless you ask Claude for a second opinion.
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: Unhoard saves the still photos you make from short clips to your photo library.
+  UnhoardTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [TidyrollTests]
+    sources: [UnhoardTests]
     dependencies:
-      - target: Tidyroll
+      - target: Unhoard
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.tidyroll.tests
-  TidyrollUITests:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.unhoard.tests
+  UnhoardUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [TidyrollUITests]
+    sources: [UnhoardUITests]
     dependencies:
-      - target: Tidyroll
+      - target: Unhoard
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.tidyroll.uitests
-        TEST_TARGET_NAME: Tidyroll
+        PRODUCT_BUNDLE_IDENTIFIER: com.kleash.unhoard.uitests
+        TEST_TARGET_NAME: Unhoard
 schemes:
-  Tidyroll:
+  Unhoard:
     build:
       targets:
-        Tidyroll: all
-        TidyrollTests: [test]
+        Unhoard: all
+        UnhoardTests: [test]
     test:
-      targets: [TidyrollTests]
-  TidyrollUI:
+      targets: [UnhoardTests]
+  UnhoardUI:
     build:
       targets:
-        Tidyroll: all
-        TidyrollUITests: [test]
+        Unhoard: all
+        UnhoardUITests: [test]
     test:
-      targets: [TidyrollUITests]
+      targets: [UnhoardUITests]

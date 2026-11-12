@@ -32,6 +32,17 @@ enum SecondOpinion {
     Give a reason of at most 12 words.
     """
 
+    /// Similar shots: Claude's per-photo answer within a group of near-identical shots.
+    static let similarLabels = ["keep", "duplicate"]
+    static let similarInstructions = """
+    You look at groups of similar photos from someone's camera roll, taken moments apart, and give each photo one of two labels:
+    - keep: the best shot of the moment, or a different moment, pose or subject worth keeping on its own.
+    - duplicate: a near-identical shot of the same moment that is worse than the best one, so it could be deleted.
+    Judge sharpness, eyes open, expressions and framing. Each set of near-identical shots keeps exactly one best shot.
+    When a photo isn't really the same shot as another, choose keep: a wrong "duplicate" can cost someone a memory.
+    Give a reason of at most 12 words.
+    """
+
     // MARK: Apple on-device (Foundation Models, iOS 27+)
 
     /// nil when Apple's on-device model can look at images here; otherwise why not.
@@ -40,10 +51,10 @@ enum SecondOpinion {
         let model = SystemLanguageModel.default
         switch model.availability {
         case .available: return model.capabilities.contains(.vision) ? nil : "This model can't look at photos"
-        case .unavailable(.deviceNotEligible): return "This iPhone doesn't support Apple Intelligence"
-        case .unavailable(.appleIntelligenceNotEnabled): return "Turn on Apple Intelligence in Settings"
-        case .unavailable(.modelNotReady): return "Apple Intelligence is still downloading"
-        case .unavailable: return "Apple Intelligence isn't available"
+        case .unavailable(.deviceNotEligible): return "This iPhone doesn't support it"
+        case .unavailable(.appleIntelligenceNotEnabled): return "Turn it on in Settings › Apple Intelligence & Siri"
+        case .unavailable(.modelNotReady): return "Apple's model is still downloading. iOS shows no progress for it; it needs Wi-Fi and goes faster while charging"
+        case .unavailable: return "Not available right now"
         }
     }
 
@@ -72,15 +83,18 @@ enum SecondOpinion {
     }
 
     /// One Messages API request for up to `batchSize` photos, with ids "1"..."n" in `sent` order.
-    /// Sensitive items are dropped here, whatever the caller passes.
-    static func claudeRequest(_ items: [(record: AssetRecord, jpeg: Data)], apiKey: String) throws -> (request: URLRequest, sent: [AssetRecord]) {
+    /// Sensitive items are dropped here, whatever the caller passes. `prompt` gets the photos as sent.
+    static func claudeRequest(_ items: [(record: AssetRecord, jpeg: Data)], apiKey: String, system: String = SecondOpinion.instructions,
+                              labels: [String] = SecondOpinion.labels,
+                              prompt: ([AssetRecord]) -> String = { "Label each of these \($0.count) photos, one result per id." })
+        throws -> (request: URLRequest, sent: [AssetRecord]) {
         let sent = items.filter { !$0.record.isSensitive }
         var content: [[String: Any]] = []
         for (i, item) in sent.enumerated() {
             content.append(["type": "text", "text": "Photo id \(i + 1):"])
             content.append(["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": item.jpeg.base64EncodedString()]])
         }
-        content.append(["type": "text", "text": "Label each of these \(sent.count) photos, one result per id."])
+        content.append(["type": "text", "text": prompt(sent.map(\.record))])
         func object(_ properties: [String: Any]) -> [String: Any] {
             ["type": "object", "properties": properties, "required": Array(properties.keys).sorted(), "additionalProperties": false]
         }
@@ -99,20 +113,41 @@ enum SecondOpinion {
             "max_tokens": 16000,
             "fallbacks": "default",
             "output_config": output,
-            "system": instructions,
+            "system": system,
             "messages": [["role": "user", "content": content] as [String: Any]],
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return (request, sent.map(\.record))
     }
 
-    static func claudeVerdicts(_ request: URLRequest, session: URLSession = .shared) async throws -> [Verdict] {
-        let (data, response) = try await session.data(for: request)
-        return try parse(data, status: (response as? HTTPURLResponse)?.statusCode ?? 0, apiKey: request.value(forHTTPHeaderField: "x-api-key") ?? "")
+    /// `retries`: how often a rate-limited (429) or overloaded (529) answer is waited out and tried again.
+    static func claudeVerdicts(_ request: URLRequest, labels: [String] = SecondOpinion.labels, retries: Int = 0,
+                               session: URLSession = .shared) async throws -> [Verdict] {
+        var attempt = 0
+        while true {
+            let (data, response) = try await session.data(for: request)
+            let http = response as? HTTPURLResponse, status = http?.statusCode ?? 0
+            if [429, 529].contains(status), attempt < retries { // as long as the server asks, else 5, 10, 20… s
+                try await Task.sleep(for: .seconds(http?.value(forHTTPHeaderField: "retry-after").flatMap(Double.init) ?? 5 * pow(2, Double(attempt))))
+                attempt += 1
+                continue
+            }
+            return try parse(data, status: status, apiKey: request.value(forHTTPHeaderField: "x-api-key") ?? "", labels: labels)
+        }
+    }
+
+    /// Verdicts by photo id: Claude's ids "1"..."n" are positions in `sent`; unknown ids are ignored.
+    static func opinions(_ verdicts: [Verdict], sent: [AssetRecord]) -> [String: (label: String, reason: String)] {
+        var out: [String: (label: String, reason: String)] = [:]
+        for v in verdicts {
+            guard let i = Int(v.id), sent.indices.contains(i - 1) else { continue }
+            out[sent[i - 1].id] = (v.label, v.reason)
+        }
+        return out
     }
 
     /// Claude's verdicts from a Messages API response; errors are user-facing and never contain the key.
-    static func parse(_ data: Data, status: Int, apiKey: String) throws -> [Verdict] {
+    static func parse(_ data: Data, status: Int, apiKey: String, labels: [String] = SecondOpinion.labels) throws -> [Verdict] {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         guard (200..<300).contains(status) else {
             switch status {
@@ -146,6 +181,57 @@ enum SecondOpinion {
         }
         return out
     }
+
+    /// Similar groups packed whole into requests of up to `batchSize` photos; a bigger group goes alone, its first `batchSize`.
+    /// Sensitive photos are left out, and so are groups with fewer than two photos left.
+    static func batches(_ groups: [[AssetRecord]]) -> [[[AssetRecord]]] {
+        var out: [[[AssetRecord]]] = []
+        for g in groups.map({ Array($0.filter { !$0.isSensitive }.prefix(batchSize)) }) where g.count > 1 {
+            if let last = out.last, last.joined().count + g.count <= batchSize { out[out.count - 1].append(g) } else { out.append([g]) }
+        }
+        return out
+    }
+
+    /// Tells Claude which of the sent photos ("1"..."n") belong together.
+    static func similarPrompt(_ sent: [AssetRecord], groups: [[AssetRecord]]) -> String {
+        let index = Dictionary(sent.enumerated().map { ($1.id, $0 + 1) }, uniquingKeysWith: { a, _ in a })
+        let sets = groups.map { $0.compactMap { index[$0.id] } }.filter { !$0.isEmpty }
+        let text = sets.enumerated().map { "group \($0 + 1) is photos \($1.map(String.init).joined(separator: ", "))" }
+        return "These \(sent.count) photos come in groups of similar shots: \(text.joined(separator: "; ")). "
+            + "Label each photo against the others in its group, one result per id."
+    }
+}
+
+extension CleanerLibrary {
+    /// Asks Claude about Similar groups one batch (request) at a time, saving each batch's labels as they arrive.
+    /// Lives as long as the cleaner, not a screen; it ends when the app does, and asking again sends only unanswered groups.
+    func askClaude(_ batches: [[[AssetRecord]]], apiKey: String) {
+        guard similarTask == nil, !isScanning, !batches.isEmpty else { return }
+        similarError = nil
+        similarRun = (0, batches.joined().count)
+        similarTask = Task {
+            for batch in batches {
+                do {
+                    let previews = await SecondOpinion.previews(Array(batch.joined()))
+                    try Task.checkCancellation()
+                    if !previews.isEmpty {
+                        let (request, sent) = try SecondOpinion.claudeRequest(previews, apiKey: apiKey, system: SecondOpinion.similarInstructions,
+                                                                            labels: SecondOpinion.similarLabels) { SecondOpinion.similarPrompt($0, groups: batch) }
+                        let verdicts = try await SecondOpinion.claudeVerdicts(request, labels: SecondOpinion.similarLabels, retries: 4)
+                        setOpinions(SecondOpinion.opinions(verdicts, sent: sent), similar: true)
+                    }
+                    similarRun?.done += batch.count
+                } catch {
+                    if !Task.isCancelled { similarError = error.localizedDescription }
+                    break
+                }
+            }
+            similarRun = nil
+            similarTask = nil
+        }
+    }
+
+    func stopAskingClaude() { similarTask?.cancel() }
 }
 
 @available(iOS 27.0, *)
@@ -160,7 +246,7 @@ enum SecondOpinion {
 
 /// The user's Anthropic API key, only in this device's Keychain.
 enum CleanerKeyStore {
-    private static let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: "com.kleash.tidyroll.anthropic", kSecAttrAccount: "api-key"]
+    private static let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: "com.kleash.unhoard.anthropic", kSecAttrAccount: "api-key"]
 
     static func save(_ key: String) throws {
         delete()
@@ -201,14 +287,14 @@ struct SecondOpinionButton: View {
             }
             .disabled(appleReason != nil || pending.isEmpty)
             Button { if CleanerKeyStore.load() == nil { settings = true } else { consent = true } } label: {
-                Label("Ask Claude…", systemImage: "sparkles")
-                Text("Sends small previews to Anthropic")
+                Label("Ask Claude (optional)…", systemImage: "sparkles")
+                Text("Not needed · sends small previews to Anthropic")
             }
             .disabled(pending.isEmpty)
             .accessibilityIdentifier("askClaude")
             Button("Second Opinion Settings", systemImage: "gearshape") { settings = true }
         } label: {
-            if let progress { Text(progress).monospacedDigit() } else { Label("Second Opinion", systemImage: "sparkles") }
+            if let progress { Text(progress).monospacedDigit() } else { Label("Second Opinion (optional)", systemImage: "sparkles") }
         }
         .disabled(progress != nil || library.isScanning)
         .accessibilityIdentifier("secondOpinionButton")
@@ -243,25 +329,35 @@ struct SecondOpinionButton: View {
 /// Shows the exact previews that would go to Anthropic, and sends them only on Send.
 struct SecondOpinionConsentSheet: View {
     let records: [AssetRecord]
+    /// Similar shots: every batch to send; `records` is the first one, shown as a sample. Sending starts `CleanerLibrary.askClaude`.
+    var batches: [[[AssetRecord]]]? = nil
     @Environment(CleanerLibrary.self) private var library
     @Environment(\.dismiss) private var dismiss
     @State private var previews: [(record: AssetRecord, jpeg: Data)]?
     @State private var sending = false
     @State private var message: String?
 
+    private var count: Int { batches.map { $0.joined().joined().count } ?? previews?.count ?? records.count }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text((previews?.count ?? records.count).formatted()).cleanerNumber()
+                        Text(count.formatted()).cleanerNumber()
                         Text("previews to Claude?").font(.title3.bold())
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("consentTitle")
                     VStack(alignment: .leading, spacing: 14) {
+                        Label("Optional. You don't need this: Unhoard finds and cleans everything without Claude.", systemImage: "hand.thumbsup.fill")
                         Label("Only these pictures leave your iPhone: at most 512 pixels, with no location, dates or camera details.", systemImage: "photo.fill")
-                        Label("Claude labels each as a memory, a utility shot or an accident. Nothing is deleted or selected.", systemImage: "tag.fill")
+                        Label(batches == nil ? "Claude labels each as a memory, a utility shot or an accident. Nothing is deleted or selected."
+                              : "Claude marks each photo in a group as keep or duplicate. Nothing is deleted or selected.", systemImage: "tag.fill")
+                        if let batches, batches.count > 1 {
+                            Label("\(batches.joined().count.formatted()) groups go in \(batches.count.formatted()) batches of up to \(SecondOpinion.batchSize) photos, and labels appear as each batch comes back. Below is the first batch. You can stop anytime from Similar Shots.",
+                                  systemImage: "square.stack.3d.up.fill")
+                        }
                         Label("Sensitive and hidden photos are never sent. Your key is billed by Anthropic.", systemImage: "lock.fill")
                     }
                     .padding()
@@ -294,7 +390,7 @@ struct SecondOpinionConsentSheet: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button { Task { await send() } } label: {
-                    Group { if sending { ProgressView() } else { Text("Send \(previews?.count ?? 0) Previews") } }.frame(maxWidth: .infinity)
+                    Group { if sending { ProgressView() } else { Text("Send \(batches == nil ? previews?.count ?? 0 : count) Previews") } }.frame(maxWidth: .infinity)
                 }
                 .cleanerProminent(.orange)
                 .controlSize(.large)
@@ -309,18 +405,14 @@ struct SecondOpinionConsentSheet: View {
 
     private func send() async {
         guard let previews, let key = CleanerKeyStore.load() else { return }
+        if let batches { library.askClaude(batches, apiKey: key); dismiss(); return }
         sending = true
         message = nil
         do {
             for start in stride(from: 0, to: previews.count, by: SecondOpinion.batchSize) {
                 let batch = Array(previews[start..<min(start + SecondOpinion.batchSize, previews.count)])
                 let (request, sent) = try SecondOpinion.claudeRequest(batch, apiKey: key)
-                var opinions: [String: (label: String, reason: String)] = [:]
-                for v in try await SecondOpinion.claudeVerdicts(request) {
-                    guard let i = Int(v.id), sent.indices.contains(i - 1) else { continue }
-                    opinions[sent[i - 1].id] = (v.label, v.reason)
-                }
-                library.setOpinions(opinions)
+                library.setOpinions(SecondOpinion.opinions(try await SecondOpinion.claudeVerdicts(request), sent: sent))
             }
             dismiss()
         } catch {
@@ -348,7 +440,7 @@ struct SecondOpinionSettings: View {
                             .symbolEffect(.breathe)
                             .accessibilityHidden(true)
                         Text("A second opinion").font(.system(.title, design: .rounded, weight: .heavy))
-                        Text("For borderline Utility shots: is it a memory, a utility shot or an accident? It only labels; it never deletes or selects.")
+                        Text("Optional, and you don't need it: Unhoard finds and cleans everything on its own, for free, on your iPhone. This only adds a label to photos you're unsure about. It never deletes or selects.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -383,9 +475,9 @@ struct SecondOpinionSettings: View {
                     }
                     Link("Get a key at console.anthropic.com", destination: URL(string: "https://console.anthropic.com/settings/keys")!)
                 } header: {
-                    Text("Claude")
+                    Text("Claude (optional)")
                 } footer: {
-                    Text("Optional. When you ask Claude, Tidyroll first shows the small previews it will send to Anthropic with your key; usage is billed to your Anthropic account. Sensitive and hidden photos are never sent.")
+                    Text("Optional, and not needed to use Unhoard. When you ask Claude, Unhoard first shows the small previews it will send to Anthropic with your key; usage is billed to your Anthropic account. Sensitive and hidden photos are never sent.")
                 }
                 if !message.isEmpty { Text(message) }
             }

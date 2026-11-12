@@ -121,6 +121,6 @@ struct CleanerThumb: View {
 #if DEBUG
 /// Debug-only launch arguments for the UI walkthrough's screenshots (see WalkthroughUITests).
 enum CleanerDemo {
-    static func has(_ name: String) -> Bool { ProcessInfo.processInfo.arguments.contains("-Tidyroll" + name) }
+    static func has(_ name: String) -> Bool { ProcessInfo.processInfo.arguments.contains("-Unhoard" + name) }
 }
 #endif

@@ -1,11 +1,11 @@
 import SwiftUI
 
 @main
-struct TidyrollApp: App {
+struct UnhoardApp: App {
     init() {
         #if DEBUG
         // The walkthrough's fresh scan, for the live-scan screenshot and recording.
-        if CleanerDemo.has("FreshScan") { try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Tidyroll/library.plist")) }
+        if CleanerDemo.has("FreshScan") { try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "Unhoard/library.plist")) }
         #endif
         CleanerBackground.registerOvernightScan() // must happen before launch finishes
     }

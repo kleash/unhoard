@@ -1,7 +1,8 @@
 import Charts
+import StoreKit
 import SwiftUI
 
-/// What each delete freed, kept on this iPhone (one small JSON file) for the history chart.
+/// What each delete cleared, kept on this iPhone (one small JSON file) for the history chart.
 enum CleanerHistory {
     struct Entry: Codable, Hashable {
         var date: Date
@@ -9,7 +10,7 @@ enum CleanerHistory {
         var count: Int
     }
 
-    static let file = URL.applicationSupportDirectory.appending(path: "Tidyroll/history.json")
+    static let file = URL.applicationSupportDirectory.appending(path: "Unhoard/history.json")
 
     static func load(_ file: URL = file) -> [Entry] {
         (try? Data(contentsOf: file)).flatMap { try? JSONDecoder().decode([Entry].self, from: $0) } ?? []
@@ -21,7 +22,7 @@ enum CleanerHistory {
     }
 }
 
-/// After a delete: the thumbnails fly into the bin, confetti, then what was freed.
+/// After a delete: the thumbnails fly into the bin, confetti, then what was cleared (space returns once Recently Deleted is emptied).
 struct CleanerCelebration: View {
     struct Summary {
         var bytes: Int64
@@ -39,6 +40,7 @@ struct CleanerCelebration: View {
     let summary: Summary
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.requestReview) private var requestReview
     @State private var flown = false
     @State private var landed = 0
     @State private var revealed = false
@@ -75,7 +77,7 @@ struct CleanerCelebration: View {
                 .frame(height: 280, alignment: .bottom)
                 .accessibilityHidden(true)
                 VStack(spacing: 10) {
-                    Text("You freed").font(.title3.weight(.semibold)).foregroundStyle(.secondary)
+                    Text("You cleared").font(.title3.weight(.semibold)).foregroundStyle(.secondary)
                     Text(summary.bytes.formatted(.byteCount(style: .file)))
                         .font(.system(size: 64, weight: .heavy, design: .rounded))
                         .minimumScaleFactor(0.5)
@@ -83,7 +85,11 @@ struct CleanerCelebration: View {
                     Text("\(summary.count.formatted()) \(summary.count == 1 ? "item" : "items") · your library is \(summary.lighter) lighter")
                         .font(.headline)
                         .multilineTextAlignment(.center)
-                    Text("They're in Recently Deleted for 30 days.").font(.footnote).foregroundStyle(.secondary)
+                    // PhotoKit can't empty Recently Deleted, and Apple documents no link to it: the steps instead.
+                    Text("The space comes back when Recently Deleted is emptied, which iPhone does after 30 days. To get it now: in Photos, open Recently Deleted (under Utilities), tap Select, then Delete All.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity)
@@ -93,6 +99,14 @@ struct CleanerCelebration: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("celebrationSummary")
                 Spacer()
+                // Text and link only: never the user's photos or numbers about their library.
+                ShareLink(item: URL(string: "https://kleash.github.io/unhoard/")!,
+                          message: Text("Unhoard cleans up your iPhone photos — free, open source, nothing leaves your phone.")) {
+                    Label("Send to someone with a full iPhone", systemImage: "square.and.arrow.up")
+                }
+                .font(.subheadline.weight(.semibold))
+                .opacity(revealed ? 1 : 0)
+                .accessibilityIdentifier("celebrationShare")
                 HStack(spacing: 12) {
                     Button { history = true } label: {
                         Label("History", systemImage: "chart.bar.fill").frame(maxWidth: .infinity)
@@ -117,6 +131,8 @@ struct CleanerCelebration: View {
             if !reduceMotion { try? await Task.sleep(for: .milliseconds(850 + 80 * summary.images.count)) }
             landed += 1
             withAnimation(reduceMotion ? nil : .spring(duration: 0.5, bounce: 0.3)) { revealed = true }
+            // After the second clean-up ever (the delete has been recorded by now); the system caps how often it shows.
+            if CleanerHistory.load().count == 2 { requestReview() }
         }
     }
 }
@@ -158,7 +174,7 @@ struct CleanerConfetti: View {
     }
 }
 
-/// Everything freed so far, as a chart by day.
+/// Everything cleared so far, as a chart by day.
 struct CleanerHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var entries: [CleanerHistory.Entry] = []
@@ -169,7 +185,7 @@ struct CleanerHistoryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Freed so far").font(.headline).foregroundStyle(.secondary)
+                        Text("Cleared so far").font(.headline).foregroundStyle(.secondary)
                         Text(total.formatted(.byteCount(style: .file))).cleanerNumber()
                         Text("\(entries.reduce(0) { $0 + $1.count }.formatted()) items over \(entries.count.formatted()) \(entries.count == 1 ? "clean-up" : "clean-ups")")
                             .font(.subheadline)
@@ -177,11 +193,11 @@ struct CleanerHistoryView: View {
                     }
                     .accessibilityElement(children: .combine)
                     if entries.isEmpty {
-                        ContentUnavailableView("Nothing freed yet", systemImage: "chart.bar",
-                                               description: Text("Each time you delete, what you freed shows up here."))
+                        ContentUnavailableView("Nothing cleared yet", systemImage: "chart.bar",
+                                               description: Text("Each time you delete, what you cleared shows up here."))
                     } else {
                         Chart(entries, id: \.date) { e in
-                            BarMark(x: .value("Day", e.date, unit: .day), y: .value("Freed (MB)", Double(e.bytes) / 1_000_000))
+                            BarMark(x: .value("Day", e.date, unit: .day), y: .value("Cleared (MB)", Double(e.bytes) / 1_000_000))
                                 .foregroundStyle(.green.gradient)
                                 .cornerRadius(6)
                         }

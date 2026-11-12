@@ -1,6 +1,6 @@
-// Draws Tidyroll's app icon: a deep violet-to-magenta backdrop with soft colour glows, two frosted glass cards fanned
+// Draws Unhoard's app icon: a deep violet-to-magenta backdrop with soft colour glows, two frosted glass cards fanned
 // like the swipe stack, and a bold four-point sparkle on the front card. 1024 × 1024, opaque (iOS rounds the corners).
-// Usage: swift scripts/make-icon.swift Tidyroll/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+// Usage: swift scripts/make-icon.swift Unhoard/Assets.xcassets/AppIcon.appiconset/AppIcon.png
 import CoreGraphics
 import Foundation
 import ImageIO

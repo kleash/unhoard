@@ -40,6 +40,7 @@ struct CleanerRootView: View {
     }
 
     private func scan() async {
+        if library.rulesChanged { tray.forgetPreselection(); library.rulesChanged = false }
         await library.scan()
         // Items deleted outside the app leave the tray once a complete scan has seen the whole library.
         if library.hasCompletedScan { tray.remove(tray.ids.filter { library.records[$0] == nil }) }
@@ -65,7 +66,7 @@ struct PhotoAccessView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 12)
                 .accessibilityHidden(true)
-                Text(denied ? "Tidyroll can't see your photos" : "Tidy up your camera roll")
+                Text(denied ? "Unhoard can't see your photos" : "Tidy up your camera roll")
                     .font(.system(.largeTitle, design: .rounded, weight: .heavy))
                 // The privacy promise first, as its own card.
                 VStack(alignment: .leading, spacing: 10) {
@@ -95,8 +96,8 @@ struct PhotoAccessView: View {
                 .padding()
                 .cleanerGlass()
                 Text(denied
-                     ? "Turn on Full Access for Tidyroll in Settings > Privacy & Security > Photos."
-                     : "To find what can go and to delete what you choose, Tidyroll needs Full Access. Choose \"Allow Full Access\" on the next screen.")
+                     ? "Turn on Full Access for Unhoard in Settings > Privacy & Security > Photos."
+                     : "To find what can go and to delete what you choose, Unhoard needs Full Access. Choose \"Allow Full Access\" on the next screen.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

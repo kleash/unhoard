@@ -8,6 +8,8 @@ struct CategoryGridView: View {
     @Environment(DeleteTray.self) private var tray
     @State private var swiping = false
     @State private var comparing: CompareGroup?
+    @State private var asking: [[[AssetRecord]]]? // Similar batches waiting for consent
+    @State private var settings = false
 
     var body: some View {
         let items = library.sections[category] ?? []
@@ -24,8 +26,9 @@ struct CategoryGridView: View {
                 ContentUnavailableView(library.status == nil ? "Nothing here" : "Still scanning…", systemImage: category.symbol,
                                        description: Text(category.blurb))
             } else {
-                AssetGrid(items: items, groups: groups, caption: { best.contains($0.id) ? "Best" : category.caption($0) },
-                          compare: groups == nil ? nil : { comparing = CompareGroup(items: $0) }) {
+                AssetGrid(items: items, groups: groups, caption: { category.caption($0) ?? (best.contains($0.id) ? "Best" : nil) },
+                          compare: groups == nil ? nil : { comparing = CompareGroup(items: $0) },
+                          askClaude: groups == nil ? nil : { ask([$0]) }) {
                     header(items)
                 }
             }
@@ -36,6 +39,18 @@ struct CategoryGridView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if category == .utility && !library.aestheticsUnsupported { SecondOpinionButton(items: items) }
+                if let groups {
+                    if let run = library.similarRun {
+                        Menu {
+                            Button("Stop Asking Claude", systemImage: "stop.fill", role: .destructive) { library.stopAskingClaude() }
+                        } label: { Text("Claude \(run.done)/\(run.total) groups").monospacedDigit() }
+                        .accessibilityIdentifier("similarClaudeProgress")
+                    } else {
+                        Button("Ask Claude about all groups (optional)…", systemImage: "sparkles") { ask(groups.filter { $0.allSatisfy { $0.similarLabel == nil } }) }
+                            .disabled(library.isScanning || groups.isEmpty)
+                            .accessibilityIdentifier("askClaudeAllGroups")
+                    }
+                }
                 Button("Swipe", systemImage: "rectangle.stack") { swiping = true }
                     .disabled(items.isEmpty)
                     .accessibilityIdentifier("swipeButton")
@@ -46,15 +61,22 @@ struct CategoryGridView: View {
                 .accessibilityIdentifier("selectAllButton")
             }
         }
-        .safeAreaInset(edge: .bottom) { DeleteButton() }
+        .safeAreaInset(edge: .bottom) { DeleteButton(scope: Set(items.map(\.id))) }
         .onAppear { preselect(groups) }
         .onChange(of: items.count) { preselect(groups) }
         .fullScreenCover(isPresented: $swiping) {
-            SwipeReviewView(items: items.filter { !tray.contains($0.id) }, tint: category.tint).environment(library).environment(tray)
+            SwipeReviewView(items: tray.unswiped(items), tint: category.tint).environment(library).environment(tray)
         }
         .fullScreenCover(item: $comparing) {
             SimilarCompareView(group: $0.items).environment(library).environment(tray)
         }
+        .sheet(isPresented: $settings) { SecondOpinionSettings() }
+        .sheet(isPresented: Binding { asking != nil } set: { if !$0 { asking = nil } }) {
+            if let asking { SecondOpinionConsentSheet(records: Array(asking[0].joined()), batches: asking).environment(library) }
+        }
+        .alert("Claude stopped", isPresented: Binding { category == .similar && library.similarError != nil } set: { if !$0 { library.similarError = nil } }) {
+            Button("OK") {}
+        } message: { Text(library.similarError ?? "") }
         .animation(.default, value: tray.count == 0)
     }
 
@@ -84,6 +106,12 @@ struct CategoryGridView: View {
         .padding(.vertical, 8)
     }
 
+    /// Similar groups to Claude: the key first if there's none, then the consent sheet.
+    private func ask(_ groups: [[AssetRecord]]) {
+        let batches = SecondOpinion.batches(groups)
+        if CleanerKeyStore.load() == nil { settings = true } else if !batches.isEmpty { asking = batches }
+    }
+
     /// Similar shots: all but each group's keeper go to the tray (the memory guard still applies).
     private func preselect(_ groups: [[AssetRecord]]?) {
         if category.preselects, let groups { tray.preselect(groups.flatMap { $0.dropFirst() }) }
@@ -105,16 +133,25 @@ struct AssetGrid<Header: View>: View {
     var caption: (AssetRecord) -> String? = { _ in nil }
     /// Similar groups: opens the side-by-side compare view.
     var compare: (([AssetRecord]) -> Void)?
+    /// Similar groups: asks Claude about this group (after consent).
+    var askClaude: (([AssetRecord]) -> Void)?
     @ViewBuilder var header: Header
     @Environment(CleanerLibrary.self) private var library
     @Environment(DeleteTray.self) private var tray
     @Environment(\.displayScale) private var displayScale
     @State private var assets: [String: PHAsset] = [:]
     @State private var width: CGFloat = 0
-    @State private var cached: Range<Int> = 0..<0
+    @State private var cached: Set<String> = [] // ids, not positions: items shrink after a delete
     @State private var drag: (start: Int, range: ClosedRange<Int>, adds: Bool)?
     @State private var preview: AssetRecord?
-    private let columns = 4, spacing: CGFloat = 2
+    @AppStorage("gridColumns") private var columns = 4 // pinch to change, like Photos
+    @State private var filter = TrayFilter.all
+
+    enum TrayFilter: String, CaseIterable { case all = "All", selected = "Selected", notSelected = "Not Selected" }
+    private func passes(_ r: AssetRecord) -> Bool { filter == .all || tray.contains(r.id) == (filter == .selected) }
+    private var shown: [AssetRecord] { filter == .all ? items : items.filter(passes) }
+    private var shownGroups: [[AssetRecord]]? { groups.map { $0.map { $0.filter(passes) }.filter { !$0.isEmpty } } }
+    private let spacing: CGFloat = 2
 
     private var side: CGFloat { max(1, (width - spacing * CGFloat(columns - 1)) / CGFloat(columns)) }
     private var pixels: CGSize { CGSize(width: side * displayScale, height: side * displayScale) }
@@ -122,9 +159,16 @@ struct AssetGrid<Header: View>: View {
     var body: some View {
         ScrollView {
             header
+            Picker("Show", selection: $filter) {
+                ForEach(TrayFilter.allCases, id: \.self) { Text($0.rawValue) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .accessibilityIdentifier("trayFilter")
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns), spacing: spacing) {
-                if let groups {
-                    let position = Dictionary(items.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+                if let groups = shownGroups {
+                    let position = Dictionary(shown.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
                     ForEach(groups, id: \.[0].id) { group in
                         Section {
                             ForEach(group) { cell(position[$0.id] ?? 0, $0) }
@@ -144,18 +188,33 @@ struct AssetGrid<Header: View>: View {
                                         .accessibilityHint("Compares the shots side by side and lets you pick the keeper.")
                                         .accessibilityIdentifier("compareButton")
                                 }
+                                if let askClaude {
+                                    Button("Ask Claude (optional)", systemImage: "sparkles") { askClaude(group) }
+                                        .labelStyle(.iconOnly)
+                                        .font(.footnote.bold())
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .cleanerGlass(Capsule(), interactive: true)
+                                        .disabled(library.isScanning || library.similarRun != nil)
+                                        .accessibilityHint("Shows the previews that would go to Claude, which marks each shot as keep or duplicate.")
+                                        .accessibilityIdentifier("askClaudeGroup")
+                                }
                             }
                             .padding(.horizontal)
                             .padding(.top, 12)
                         }
                     }
                 } else {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { i, record in cell(i, record) }
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, record in cell(i, record) }
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .gesture(DragSelectGesture(changed: dragged))
         }
+        .simultaneousGesture(MagnifyGesture().onEnded { value in
+            let next = value.magnification > 1.15 ? columns - 1 : value.magnification < 0.87 ? columns + 1 : columns
+            withAnimation(.snappy) { columns = min(6, max(2, next)) }
+        })
         .sensoryFeedback(.selection, trigger: tray.count)
         .sensoryFeedback(.selection, trigger: drag?.range)
         .task(id: items.map(\.id)) {
@@ -168,7 +227,7 @@ struct AssetGrid<Header: View>: View {
             cache(around: 0)
         }
         .onDisappear { library.images.stopCachingImagesForAllAssets() }
-        .fullScreenCover(item: $preview) { AssetPreview(record: $0).environment(library).environment(tray) }
+        .fullScreenCover(item: $preview) { AssetPreview(records: shown, start: $0).environment(library).environment(tray) }
     }
 
     private func cell(_ i: Int, _ record: AssetRecord) -> some View {
@@ -176,9 +235,9 @@ struct AssetGrid<Header: View>: View {
             .frame(height: side)
             .contentShape(Rectangle())
             .onTapGesture { tray.toggle(record.id) }
-            .onLongPressGesture { preview = record }
+            .onLongPressGesture(minimumDuration: 0.25) { preview = record }
             .accessibilityAction(named: "Preview") { preview = record }
-            .onAppear { if i % columns == 0 || groups != nil { cache(around: i) } }
+            .onAppear { if i % columns == 0 || shownGroups != nil { cache(around: i) } }
     }
 
     private func isSelected(_ i: Int, _ r: AssetRecord) -> Bool {
@@ -190,23 +249,23 @@ struct AssetGrid<Header: View>: View {
     private func index(at p: CGPoint) -> Int {
         let col = min(columns - 1, max(0, Int(p.x / (side + spacing))))
         let row = max(0, Int(p.y / (side + spacing)))
-        return min(items.count - 1, row * columns + col)
+        return min(shown.count - 1, row * columns + col)
     }
 
     private func dragged(_ p: CGPoint, _ state: UIGestureRecognizer.State) {
         // shortcut: no drag-select in grouped grids (headers break the row maths); tap items there.
-        guard !items.isEmpty, groups == nil else { return }
+        guard !shown.isEmpty, shownGroups == nil else { return }
         switch state {
         case .began:
             let i = index(at: p)
-            drag = (i, i...i, !tray.contains(items[i].id))
+            drag = (i, i...i, !tray.contains(shown[i].id))
         case .changed:
             guard let d = drag else { return }
             let i = index(at: p)
             drag?.range = min(d.start, i)...max(d.start, i)
         case .ended:
             guard let d = drag else { return }
-            let ids = items[d.range].filter { !d.adds || !$0.isKeptFromBulk }.map(\.id) // a sweep never adds guarded memories or sensitive items; tap them
+            let ids = shown[d.range.clamped(to: 0...max(0, shown.count - 1))].filter { !d.adds || !$0.isKeptFromBulk }.map(\.id) // a sweep never adds guarded memories or sensitive items; tap them
             d.adds ? tray.add(ids) : tray.remove(ids)
             drag = nil
         default:
@@ -218,12 +277,12 @@ struct AssetGrid<Header: View>: View {
     /// Pre-caches thumbnails a few screens around row-start `i` and lets go of the rest.
     private func cache(around i: Int) {
         guard !assets.isEmpty else { return }
-        let window = max(0, i - columns * 8)..<min(items.count, i + columns * 16)
-        let old = Set(cached), new = Set(window)
-        func list(_ s: Set<Int>) -> [PHAsset] { s.compactMap { assets[items[$0].id] } }
+        let lo = min(max(0, i - columns * 8), shown.count), hi = max(lo, min(shown.count, i + columns * 16))
+        let old = cached, new = Set(shown[lo..<hi].map(\.id))
+        func list(_ s: Set<String>) -> [PHAsset] { s.compactMap { assets[$0] } }
         library.images.stopCachingImages(for: list(old.subtracting(new)), targetSize: pixels, contentMode: .aspectFill, options: nil)
         library.images.startCachingImages(for: list(new.subtracting(old)), targetSize: pixels, contentMode: .aspectFill, options: nil)
-        cached = window
+        cached = new
     }
 }
 

@@ -1,6 +1,6 @@
 import Photos
 import XCTest
-@testable import Tidyroll
+@testable import Unhoard
 
 func rec(_ id: String, modified: TimeInterval = 0, video: Double? = nil, favorite: Bool = false, edited: Bool = false,
             album: Bool = false, screenshot: Bool = false, chat: Bool = false, bytes: Int64 = 1_000, accident: Bool? = nil) -> AssetRecord {
@@ -169,6 +169,32 @@ final class TrayTests: XCTestCase {
         XCTAssertEqual(saved.last?.date, Date(timeIntervalSince1970: 2))
     }
 
+    func testSwipeKeepsPersistAndLeaveTheDeck() {
+        let tray = DeleteTray(file: url)
+        let items = [rec("a"), rec("b"), rec("c")]
+        tray.add(["a"])
+        tray.keep(["b"])
+        XCTAssertEqual(DeleteTray(file: url).unswiped(items).map(\.id), ["c"], "kept and trayed items don't come back")
+        tray.unkeep(["b"]) // undo
+        XCTAssertEqual(DeleteTray(file: url).unswiped(items).map(\.id), ["b", "c"])
+    }
+
+    func testOnThisDayIsTodaysDateInEarlierYears() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        func taken(_ id: String, _ y: Int, _ m: Int, _ d: Int, hour: Int = 12) -> AssetRecord {
+            var r = rec(id)
+            r.created = calendar.date(from: DateComponents(year: y, month: m, day: d, hour: hour))
+            return r
+        }
+        var undated = rec("undated")
+        undated.created = nil
+        let today = calendar.date(from: DateComponents(year: 2026, month: 11, day: 12, hour: 9))!
+        let records = [taken("2020", 2020, 11, 12), taken("2015late", 2015, 11, 12, hour: 23), taken("thisYear", 2026, 11, 12),
+                       taken("dayBefore", 2020, 11, 11, hour: 23), taken("otherMonth", 2020, 10, 12), undated]
+        XCTAssertEqual(AssetRecord.onThisDay(records, today: today, calendar: calendar).map(\.id), ["2015late", "2020"], "oldest first")
+    }
+
     func testPreselectionNeverPicksSensitiveItems() {
         var card = rec("card")
         card.sensitive = "Card number"
@@ -185,6 +211,41 @@ final class TrayTests: XCTestCase {
         let reopened = DeleteTray(file: url)
         XCTAssertEqual(reopened.ids, ["x", "z"])
         XCTAssertEqual(reopened.state.offered, ["z"])
+    }
+
+    func testRulesUpgradeRedoesOnlyWhatChanged() {
+        var id = rec("id"), card = rec("card")
+        id.sensitive = "ID with photo"
+        card.sensitive = "Card number"
+        id.similarPrev = "x"
+        id.similarToPrev = true
+        var cache = ScanCache(records: ["id": id, "card": card])
+        cache.rules = nil // a cache from before rules were versioned
+        cache.upgradeRules()
+        XCTAssertNil(cache.records["id"]!.sensitive)
+        XCTAssertEqual(cache.records["card"]!.sensitive, "Card number")
+        XCTAssertNil(cache.records["id"]!.similarPrev)
+        XCTAssertEqual(cache.rules, ScanCache.currentRules)
+        XCTAssertEqual(ScanCache().rules, ScanCache.currentRules, "new caches are saved with the current rules")
+    }
+
+    func testForgetPreselectionKeepsOwnPicks() {
+        let tray = DeleteTray(file: url)
+        tray.preselect([rec("auto")])
+        tray.add(["mine"])
+        tray.forgetPreselection()
+        XCTAssertEqual(tray.ids, ["mine"])
+        tray.preselect([rec("auto")])
+        XCTAssertEqual(tray.ids, ["mine", "auto"], "offered afresh")
+    }
+
+    @MainActor func testCommitDeletesOnlyTheGivenIDs() async {
+        let tray = DeleteTray(file: url)
+        tray.add(["a", "b", "c"]) // not in the photo library, so nothing reaches PhotoKit's dialog
+        let library = CleanerLibrary(file: url.appendingPathExtension("library"))
+        let outcome = await tray.commit(library, ids: ["a", "b", "x"])
+        XCTAssertEqual(outcome, .deleted(2))
+        XCTAssertEqual(tray.ids, ["c"])
     }
 }
 
@@ -220,5 +281,12 @@ final class ScannerResumeTests: XCTestCase {
         // 3. With a token, the next scan is incremental and changes nothing.
         let again = await LibraryScanner.scan(done, checkpoint: { _ in }, progress: { _, _ in })
         XCTAssertEqual(again.records, done.records)
+    }
+
+    func testResumedProgressCountsTheWholeLibraryAndEstimatesFromThisRun() {
+        // 500 of 1,000 were done before; this run did 100 more in 100 s, so 400 left at 1/s.
+        let text = LibraryScanner.progressText("Analysing photos", 600, 1000, since: Date(timeIntervalSinceNow: -100), resumedAt: 500)
+        XCTAssertTrue(text.hasPrefix("Analysing photos 60% · 600 of 1,000"), text)
+        XCTAssertTrue(text.contains("about 7 min left") || text.contains("about 6 min left"), text)
     }
 }

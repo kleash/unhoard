@@ -1,17 +1,21 @@
 import SwiftUI
 
 /// The floating Delete button shown over every cleaner screen while the tray has items; opens the commit sheet.
+/// With a `scope` (a category's items), it counts and deletes only the tray items in it; on the home screen, the whole tray.
 struct DeleteButton: View {
+    var scope: Set<String>? = nil
     @Environment(CleanerLibrary.self) private var library
     @Environment(DeleteTray.self) private var tray
     @State private var showing = false
 
     var body: some View {
-        let bytes = tray.ids.reduce(Int64(0)) { $0 + (library.records[$1]?.bytes ?? 0) }
+        let ids = scope.map { tray.ids.intersection($0) } ?? tray.ids
+        let count = ids.count
+        let bytes = ids.reduce(Int64(0)) { $0 + (library.records[$1]?.bytes ?? 0) }
         Button { showing = true } label: {
             HStack(spacing: 10) {
-                Image(systemName: "trash.fill").symbolEffect(.bounce, value: tray.count)
-                Text("Delete \(tray.count.formatted())").contentTransition(.numericText())
+                Image(systemName: "trash.fill").symbolEffect(.bounce, value: count)
+                Text("Delete \(count.formatted())").contentTransition(.numericText())
                 Text(bytes.formatted(.byteCount(style: .file)))
                     .font(.headline.monospacedDigit())
                     .opacity(0.85)
@@ -27,16 +31,16 @@ struct DeleteButton: View {
         }
         .buttonStyle(.plain)
         .padding(.bottom, 8)
-        .opacity(tray.count > 0 ? 1 : 0)
-        .scaleEffect(tray.count > 0 ? 1 : 0.8)
-        .disabled(tray.count == 0)
-        .accessibilityHidden(tray.count == 0)
-        .accessibilityLabel("Delete \(tray.count) items, \(bytes.formatted(.byteCount(style: .file)))")
+        .opacity(count > 0 ? 1 : 0)
+        .scaleEffect(count > 0 ? 1 : 0.8)
+        .disabled(count == 0)
+        .accessibilityHidden(count == 0)
+        .accessibilityLabel("Delete \(count) items, \(bytes.formatted(.byteCount(style: .file)))")
         .accessibilityHint("Review the delete tray and confirm.")
         .accessibilityIdentifier("deleteButton")
-        .animation(.snappy, value: tray.count)
+        .animation(.snappy, value: count)
         .sheet(isPresented: $showing) {
-            DeleteCommitSheet().environment(library).environment(tray)
+            DeleteCommitSheet(ids: ids).environment(library).environment(tray)
         }
     }
 }
@@ -44,6 +48,7 @@ struct DeleteButton: View {
 /// The tray's items (tap to take one out, tap again to put it back), what deleting means, and the one Delete action.
 /// After a delete, the celebration takes over the sheet.
 struct DeleteCommitSheet: View {
+    let ids: Set<String>
     @Environment(CleanerLibrary.self) private var library
     @Environment(DeleteTray.self) private var tray
     @Environment(\.dismiss) private var dismiss
@@ -58,7 +63,7 @@ struct DeleteCommitSheet: View {
             if let celebration { CleanerCelebration(summary: celebration) } else { trayContent }
         }
         .onAppear {
-            shown = tray.ids.compactMap { library.records[$0] }.sorted { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }
+            shown = ids.compactMap { library.records[$0] }.sorted { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }
         }
         .sensoryFeedback(.success, trigger: done)
         .interactiveDismissDisabled(deleting)
@@ -134,7 +139,7 @@ struct DeleteCommitSheet: View {
         let bytes = selected.reduce(Int64(0)) { $0 + $1.bytes }
         var images: [UIImage] = []
         for r in selected.prefix(8) { if let i = await CleanerThumb.load(r.id, pixels: 200) { images.append(i) } }
-        let outcome = await tray.commit(library)
+        let outcome = await tray.commit(library, ids: Set(selected.map(\.id)))
         deleting = false
         switch outcome {
         case .deleted(let count):
