@@ -3,19 +3,27 @@
 Ready to paste. Counts are characters as App Store Connect counts them (checked with Python `len`). Bundle id
 `com.kleash.unhoard`, version 1.0.0, iPhone only, iOS 18 or later.
 
-## Name (28/30)
+## Name (29/30)
 
 ```text
-Unhoard – Screenshot Cleaner
+Unhoard: Clean Up Your Photos
 ```
 
-The dash is an en dash (–), one character. Use the same name and subtitle in both English localizations.
+The user's pick (2026-11-12) over the research's "Unhoard: Screenshot Cleaner": the app is more than a screenshot cleaner.
 
-## Subtitle (30/30)
+## Subtitle (28/30)
 
 ```text
-Swipe Photos, Blurry & Similar
+Screenshots, Blurry & Videos
 ```
+
+In App Store Connect (en-US), with these keywords (100/100, none repeating a name or subtitle word):
+
+```text
+cleaner,delete,similar,swipe,storage,space,full,free,large,screen,recording,camera,roll,gallery,mass
+```
+
+The sets below were written for the earlier name; English (UK) falls back to the US listing for now.
 
 ## Keywords
 
@@ -225,7 +233,7 @@ stand-ins.
 2. **Swipe mode on a screenshot, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
 3. **Compare in Similar Shots, Best badge visible.** Caption: "Keep the best of every similar shot"
 4. **Home: all categories with counts and sizes.** Caption: "Blurry shots, big videos and more"
-5. **Home trust row or the Claude consent sheet.** Caption: "Scanned on your iPhone. No account, no ads"
+5. **Home trust row or the Claude consent sheet.** Caption used: "Review everything before it's deleted" (the shots are made by `UnhoardUITests/StoreScreenshotsUITests` on a simulator loaded with stock media only)
 
 Avoid captions like "Everything stays on your iPhone" without the Claude caveat, and any "free" price wording on the
 first two shots.

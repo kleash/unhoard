@@ -300,7 +300,8 @@ struct SecondOpinionButton: View {
         .disabled(progress != nil || library.isScanning)
         .accessibilityIdentifier("secondOpinionButton")
         .sheet(isPresented: $settings, onDismiss: {
-            if askAfterKey, CleanerKeyStore.load() != nil { consent = true }
+            // A sheet asked for while the last one is still going away is dropped, so wait for it.
+            if askAfterKey, CleanerKeyStore.load() != nil { Task { try? await Task.sleep(for: .milliseconds(400)); consent = true } }
             askAfterKey = false
         }) { SecondOpinionSettings(asking: askAfterKey) }
         .sheet(isPresented: $consent) { SecondOpinionConsentSheet(records: Array(pending.prefix(SecondOpinion.maxPerAsk))).environment(library) }

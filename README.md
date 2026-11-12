@@ -1,30 +1,147 @@
-# Unhoard
+<p align="center">
+  <img src="docs/media/icon.png" width="128" height="128" alt="Unhoard app icon: two glass cards and a sparkle on a violet glow">
+</p>
 
-**Clear screenshots, blurry photos, similar shots and big videos off your iPhone with a swipe.**
+<h1 align="center">Unhoard</h1>
 
-<!-- TODO: replace with the App Store link (and badge) once the app is live. -->
-**App Store:** coming soon · **Website:** [kleash.github.io/unhoard](https://kleash.github.io/unhoard/) ·
-[Support](https://kleash.github.io/unhoard/support.html) · [Privacy](https://kleash.github.io/unhoard/privacy.html)
+<p align="center">
+  <b>Your camera roll, minus the junk.</b><br>
+  Swipe away screenshots, blurry shots, near-identical re-takes and forgotten videos.<br>
+  Free, scanned on your iPhone, open source.
+</p>
 
-<!-- TODO: add 3–5 screenshots or a short demo GIF here (files not created yet). -->
+<p align="center">
+  <!-- TODO: when the app is live, link this badge to its App Store page and change "coming soon" to "download". -->
+  <img src="https://img.shields.io/badge/App_Store-coming_soon-8b5cf6?logo=appstore&logoColor=white" alt="App Store: coming soon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a855f7" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/iOS-18%2B-c026d3?logo=apple&logoColor=white" alt="iOS 18 or later">
+  <img src="https://img.shields.io/badge/Swift-SwiftUI-db2777?logo=swift&logoColor=white" alt="Swift and SwiftUI">
+  <img src="https://img.shields.io/badge/scan-on--device-7c3aed" alt="Scans on the device">
+  <img src="https://img.shields.io/badge/tracking-none-16a34a" alt="No tracking">
+</p>
 
-## Why Unhoard
+<p align="center">
+  <a href="https://kleash.github.io/unhoard/">Website</a> ·
+  <a href="https://kleash.github.io/unhoard/support.html">Support</a> ·
+  <a href="https://kleash.github.io/unhoard/privacy.html">Privacy</a> ·
+  <a href="#for-developers">Build it yourself</a>
+</p>
 
-- **Free.** No subscription, no ads, no in-app purchases, no account.
-- **Nothing leaves your iPhone.** Scanning and analysis run on the iPhone. The one exception is opt-in: a second
-  opinion from Claude with your own API key, after a consent sheet shows exactly what will be sent.
-- **Careful.** Favourites, edited photos and photos in your albums are never selected for you, and deleted items wait
-  in Recently Deleted for 30 days.
-- **Open source.** MIT-licensed; every line is here to read.
+<p align="center">
+  <img src="docs/media/home.jpg" width="23%" alt="Home: every category with its count and size">
+  <img src="docs/media/swipe.jpg" width="23%" alt="Swipe: left to delete, right to keep">
+  <img src="docs/media/screenshots.jpg" width="23%" alt="Screenshots: select them all and clear them in one go">
+  <img src="docs/media/compare.jpg" width="23%" alt="Compare: two similar shots side by side">
+</p>
 
-## What it does
+<!-- TODO: uncomment once docs/media/demo.gif exists.
+<p align="center"><img src="docs/media/demo.gif" width="300" alt="Unhoard demo: scanning, swiping and deleting"></p>
+-->
+
+<p align="center">
+  <img src="docs/media/zero.svg" width="100%" alt="0 ads, 0 subscriptions, 0 trackers, 100% open source">
+</p>
+
+## 🔎 What it finds
+
+| | Category | What's in it |
+| :-: | --- | --- |
+| 📸 | **Screenshots & Recordings** | Every screenshot and screen recording, oldest first |
+| 👯 | **Similar Shots** | Near-identical re-takes taken within 2 minutes, grouped, with the **Best** one marked |
+| 🌫️ | **Blurry** | Photos with nothing in focus (night shots are left out) |
+| 🧾 | **Utility Shots** | Receipts, labels, whiteboards: photos of things, not moments |
+| 🎬 | **Large Videos** | Everything over 50 MB, biggest first |
+| 🫣 | **Accidental Clips** | Pocket shots and covered-lens clips under 3 seconds |
+| ✨ | **Short Moments** | Other clips under 3 seconds. **Make Still** keeps the sharpest frame as a photo |
+| 💬 | **Saved from Apps** | Media that chat and social apps saved to your library, labelled with the app |
+| 🔐 | **Sensitive** | Passports, IDs, cards, passwords, Wi-Fi labels. Hide them in the locked Hidden album |
+
+Every category shows its count and size. Exact duplicates? Apple Photos already has a Duplicates album for those.
+
+## 💜 Why it's different
+
+- **Free, for real.** No subscription, no ads, no in-app purchases, no account.
+- **Scanned on your iPhone.** Analysis runs on local thumbnails with Apple's Vision framework. No server.
+- **Open source.** MIT-licensed. Every threshold is in [the table below](#how-the-categories-are-chosen), with how
+  well it works.
+- **Memory guard.** Favourites, edited photos and photos in your own albums are never selected for you.
+- **Scans that pick up where they left off.** Stop halfway, and it carries on from there. Later scans only read
+  what changed, and a scan keeps going in the background as long as iOS allows.
+- **Swipe or select.** A card stack (left to delete, right to keep, with Undo), or a grid where you drag to select a
+  range.
+- **Nothing goes without you.** Everything waits in one delete tray, and iOS asks you to confirm once.
+
+## ⚡ How it works in 30 seconds
+
+1. Open Unhoard and allow access to Photos. Categories fill in while it scans.
+2. Pick a category. Swipe left to delete, right to keep, or tap and drag in the grid.
+3. Tap the floating **Delete** button, check the tray, and confirm.
+4. To get the space back right away, empty **Recently Deleted** in Photos (see the FAQ).
+
+## 🔒 Privacy
+
+Unhoard has no accounts, analytics, ads or tracking, and the developer collects nothing. The only network request it
+makes itself is optional: a **second opinion from Claude** on borderline photos, with your own Anthropic API key,
+after a consent sheet shows the exact small previews that will be sent (512 px at most, no location, dates or camera
+details). Sensitive and hidden photos are never sent. With Apple Intelligence (iOS 27), the second opinion can run on
+the iPhone instead.
+
+Don't take our word for it: turn on
+[App Privacy Report](https://support.apple.com/en-us/102188) (Settings › Privacy & Security › App Privacy Report)
+and see for yourself. Full details in the [privacy policy](https://kleash.github.io/unhoard/privacy.html).
+
+## ❓ FAQ
+
+<details>
+<summary><b>Does it upload my photos?</b></summary>
+
+No. Scanning runs on your iPhone. The only time anything leaves it is if you ask Claude for a second opinion, which
+is off until you add your own API key, and you see exactly which small previews go before you confirm.
+</details>
+
+<details>
+<summary><b>I deleted gigabytes. Why is my storage still full?</b></summary>
+
+Deleted items go to **Recently Deleted** and stay there for 30 days, so you can change your mind. The space comes
+back when it's emptied: Photos › Utilities › Recently Deleted › Select › Delete All. Apps aren't allowed to empty it
+for you.
+</details>
+
+<details>
+<summary><b>Will it delete my favourites?</b></summary>
+
+Not unless you pick them yourself. Favourites, edited photos and photos in your albums are never selected for you,
+and nothing is deleted until you confirm. If you use an iCloud Shared Library, deleting a shared item removes it for
+everyone in it.
+</details>
+
+<details>
+<summary><b>Is it really free?</b></summary>
+
+Yes: no ads, no subscription, no in-app purchases. The optional Claude second opinion uses your own Anthropic key,
+so Anthropic bills you for that if you use it.
+</details>
+
+<details>
+<summary><b>How accurate is it?</b></summary>
+
+Screenshots, recordings and large videos come straight from what iOS records, so those lists are exact. The rest is
+image analysis, tuned cautiously: Blurry finds few photos and isn't perfect, so only Similar Shots ever selects anything
+for you, and it keeps the best of each group. The honest numbers are [below](#how-the-categories-are-chosen).
+</details>
+
+<br>
+
+---
+
+## For developers
 
 Unhoard is an iPhone app that helps you clean up your photo library. It finds screenshots and screen recordings,
 similar shots, blurry photos, utility shots (receipts, labels, whiteboards), sensitive photos (passports, cards,
 passwords), large videos, accidental clips, short moments and media saved from chat and social apps. You review them in a grid or one at a
 time with swipes, collect what should go in a delete tray, and delete it all in one step.
 
-## Features
+### Features
 
 - **Categories**, each with a count and size:
   - Screenshots & Recordings (oldest first): `PHAssetMediaSubtype.photoScreenshot`, plus screen recordings. A
@@ -76,7 +193,7 @@ time with swipes, collect what should go in a delete tray, and delete it all in 
   iOS's own progress UI. While a scan is unfinished, an overnight processing task (only when the phone is charging)
   finishes it.
 
-## How the categories are chosen
+### How the categories are chosen
 
 All on local thumbnails with Apple's Vision framework (iOS 18 API), in `PhotoAnalysis.swift`.
 
@@ -97,19 +214,19 @@ and it keeps each group's best.
 lens smudge fail, so Utility Shots shows "Needs an iPhone" and Similar Shots stays empty. Debug builds launched with
 `-UnhoardSimulatorStandIns` (the UI walkthrough does) use stand-ins for aesthetics and feature prints.
 
-## Privacy
+### Privacy
 
 Everything happens on your iPhone. No accounts, no analytics. The only network request Unhoard makes itself is the
 opt-in Claude second opinion, after the consent sheet, with your own key. Photos may download originals from iCloud
 for previews and short-clip checks; photo analysis never downloads anything. Unhoard asks for full Photos access to read and delete, and
 for permission to add the stills it makes.
 
-## Requirements
+### Requirements
 
 - Xcode 27.2 (iOS SDK 27), deploying to iOS 18 or later, iPhone only
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (the `.xcodeproj` and `Unhoard/Info.plist` are generated and not committed)
 
-## Build, run and test
+### Build, run and test
 
 ```sh
 xcodegen generate
@@ -140,7 +257,7 @@ sqlite3 ~/Library/Developer/CoreSimulator/Devices/<udid>/data/Library/TCC/TCC.db
 xcrun simctl boot <udid>
 ```
 
-## App Store notes
+### App Store notes
 
 - **File sizes use an undocumented PhotoKit key.** Sizes are read with `PHAssetResource.value(forKey: "fileSize")`.
   This isn't public API, so App Review may flag it or a future iOS may drop it. Unhoard checks that the key exists
@@ -148,7 +265,7 @@ xcrun simctl boot <udid>
   See `AssetRecord.fileSize`.
 - Background scanning only works on a device. The simulator doesn't run continued-processing or processing tasks.
 
-## Release
+### Release
 
 ```sh
 DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh            # archive, check, export build/ios/Unhoard.ipa
@@ -157,6 +274,6 @@ DEVELOPMENT_TEAM=<team id> scripts/release-ios.sh --upload   # and upload for Te
 
 The app icon (two glass cards and a sparkle on a violet-to-magenta glow) is drawn by `swift scripts/make-icon.swift Unhoard/Assets.xcassets/AppIcon.appiconset/AppIcon.png`.
 
-## License
+### License
 
 MIT, see [LICENSE](LICENSE).

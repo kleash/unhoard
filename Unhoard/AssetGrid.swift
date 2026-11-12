@@ -72,7 +72,7 @@ struct CategoryGridView: View {
             SimilarCompareView(group: $0.items).environment(library).environment(tray)
         }
         .sheet(isPresented: $settings, onDismiss: {
-            if let groups = waiting, CleanerKeyStore.load() != nil { ask(groups) }
+            if let groups = waiting, CleanerKeyStore.load() != nil { Task { try? await Task.sleep(for: .milliseconds(400)); ask(groups) } } // see SecondOpinionButton
             waiting = nil
         }) { SecondOpinionSettings(asking: waiting != nil) }
         .sheet(isPresented: Binding { asking != nil } set: { if !$0 { asking = nil } }) {
