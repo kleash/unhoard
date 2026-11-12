@@ -79,33 +79,66 @@ people with big libraries.
 
 ---
 
-## 3. r/iosapps post (DRAFT)
+## 3. Reddit launch post, from your own account (DRAFT)
 
-Check the subreddit's self-promotion rules and flair first.
+**Subreddit: r/iosapps.** It exists for sharing iOS apps and developers post there. Its rules (as I understand them;
+re-read the sidebar before posting, they change): say you're the developer, use the right post flair, one post per
+app, no vote begging, and answer comments. Bigger subs like r/iphone and r/apple restrict app self-promotion, so
+don't cross-post there unless their current rules allow it.
 
 **Title:**
 
 ```text
-I made a free, open-source photo cleaner: swipe away screenshots, blurry and similar shots, no subscription
+I had [6,000] screenshots on my iPhone, so I built a free, open-source cleaner with no subscription
 ```
 
 **Body:**
 
-Hi all, I'm the developer. Unhoard finds screenshots, similar shots (keeps the best one), blurry photos, receipts,
-big videos, accidental pocket clips and media saved from chat apps. Swipe left to delete, right to keep, or tap
-through a grid, and everything goes in one tray you delete in one step.
+I had [6,000] screenshots and [X GB] of photos I'd never look at again. [Fill in your real numbers.] I wanted to
+clear them without paying for a subscription or uploading my library anywhere, so I built Unhoard. I'm the
+developer.
 
-- Free: no ads, no subscription, no account
-- The scan runs on your iPhone, nothing is uploaded
-- Favourites and photos in your albums are never selected for you
+What it does:
+
+- Finds screenshots and screen recordings, similar shots (keeps the best one), blurry photos, receipts, big videos,
+  accidental pocket clips and media saved from chat apps
+- Swipe left to delete, right to keep, or select in a grid; everything goes in one tray you delete in one step
+- Never selects your favourites, edited photos or photos in your albums for you
+- Free: no ads, no subscription, no account. The scan runs on your iPhone
 - Open source (MIT): https://github.com/kleash/unhoard
 
-Deleted items go to Recently Deleted, so empty that in Photos to get the space back. App Store: TODO. Feedback
-welcome!
+Honest limits: blurry detection is cautious and finds only a few, and exact duplicates are left to the Photos
+Duplicates album. Deleted items go to Recently Deleted, so empty that in Photos to get the space back.
+
+App Store: TODO. I'd love feedback, especially on what it misses.
 
 ---
 
-## 4. AlternativeTo listing (DRAFT)
+## 4. Threads post, from your own account (DRAFT)
+
+Threads allows 500 characters; this is 374, including the placeholders.
+
+```text
+I had [6,000] screenshots on my iPhone. [Fill in your real number.]
+
+So I built Unhoard. It finds screenshots, blurry and similar shots, big videos and pocket clips, and you swipe them away: left to delete, right to keep.
+
+Free: no subscription, no ads, no account. The scan runs on the iPhone, and the code is open source.
+
+App Store: [TODO]
+Code: github.com/kleash/unhoard
+```
+
+---
+
+## Skipped: creator and influencer pitches
+
+Cold pitches to creators or influencers are skipped by decision; there are none in this file. Only the roundup-author
+email (section 1) is outreach to people you don't know.
+
+---
+
+## 5. AlternativeTo listing (DRAFT)
 
 **Name:** Unhoard
 **Platform:** iPhone · **License:** Free, Open Source (MIT)

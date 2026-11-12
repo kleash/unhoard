@@ -145,7 +145,7 @@ struct DeleteCommitSheet: View {
         case .deleted(let count):
             done += 1
             CleanerHistory.record(CleanerHistory.Entry(date: .now, bytes: bytes, count: count))
-            celebration = .init(bytes: bytes, count: count, libraryBytes: libraryBytes, images: images)
+            celebration = .init(bytes: bytes, count: count, libraryBytes: libraryBytes, images: images, countLine: library.screenshotCountLine)
         case .cancelled:
             break
         case .timedOut:

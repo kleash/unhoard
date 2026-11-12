@@ -30,6 +30,8 @@ struct CleanerCelebration: View {
         /// The whole library's size before the delete.
         var libraryBytes: Int64
         var images: [UIImage]
+        /// The screenshot count line to share instead of the plain message (see `CleanerLibrary.screenshotCountLine`).
+        var countLine: String?
 
         var lighter: String {
             let p = Double(bytes) / Double(max(libraryBytes, 1)) * 100
@@ -99,9 +101,9 @@ struct CleanerCelebration: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("celebrationSummary")
                 Spacer()
-                // Text and link only: never the user's photos or numbers about their library.
-                ShareLink(item: URL(string: "https://kleash.github.io/unhoard/")!,
-                          message: Text("Unhoard cleans up your iPhone photos — free, open source, nothing leaves your phone.")) {
+                // Text only: never the user's photos, and no numbers about their library beyond the screenshot count line.
+                ShareLink(item: summary.countLine
+                          ?? "Unhoard cleans up your iPhone photos — free, open source, nothing leaves your phone. https://kleash.github.io/unhoard/") {
                     Label("Send to someone with a full iPhone", systemImage: "square.and.arrow.up")
                 }
                 .font(.subheadline.weight(.semibold))

@@ -93,6 +93,9 @@ struct CategoryGridView: View {
             .minimumScaleFactor(0.6)
             .accessibilityElement(children: .combine)
             Text(category.blurb).font(.subheadline).foregroundStyle(.secondary)
+            if category == .screenshots, let line = library.screenshotCountLine {
+                ShareLink("Share your count", item: line).font(.subheadline.weight(.semibold)).accessibilityIdentifier("shareCount")
+            }
             if category == .sensitive {
                 Label("Never selected for you. Open one to hide it, or tap to add it to the tray.", systemImage: "eye.slash")
                     .font(.subheadline.weight(.medium))

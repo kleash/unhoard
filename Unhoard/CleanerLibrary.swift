@@ -544,3 +544,20 @@ enum LibraryScanner {
         if kept { save() }
     }
 }
+
+extension CleanerLibrary {
+    /// A line to share once a finished scan with full access has counted 500+ photo screenshots (recordings aren't counted).
+    var screenshotCountLine: String? {
+        guard status == nil, hasCompletedScan, PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized else { return nil }
+        let shots = (sections[.screenshots] ?? []).filter(\.isScreenshot)
+        return Self.countLine(count: shots.count, oldest: shots.compactMap(\.created).min())
+    }
+
+    /// The count and the oldest one's month and year only: never photos, sizes or other categories. Nil under 500.
+    nonisolated static func countLine(count: Int, oldest: Date?, locale: Locale = .current) -> String? {
+        guard count >= 500 else { return nil }
+        let since = oldest.map { " The oldest is from \($0.formatted(.dateTime.month(.wide).year().locale(locale)))." } ?? ""
+        return "I have \(count.formatted(.number.locale(locale))) screenshots on my iPhone.\(since) "
+            + "Counted on my phone by Unhoard (free, nothing uploaded): https://kleash.github.io/unhoard/"
+    }
+}

@@ -3,73 +3,98 @@
 Ready to paste. Counts are characters as App Store Connect counts them (checked with Python `len`). Bundle id
 `com.kleash.unhoard`, version 1.0.0, iPhone only, iOS 18 or later.
 
-## Name (29/30)
+## Name (28/30)
 
 ```text
-Unhoard – Swipe Photo Cleaner
+Unhoard – Screenshot Cleaner
 ```
 
-The dash is an en dash (–), one character.
+The dash is an en dash (–), one character. Use the same name and subtitle in both English localizations.
 
-## Subtitle (29/30)
+## Subtitle (30/30)
 
 ```text
-Screenshots, Blurry & Similar
+Swipe Photos, Blurry & Similar
 ```
 
-## Keywords (97/100)
+## Keywords
+
+Name and subtitle words (never repeat them in keywords): Unhoard, Screenshot, Cleaner, Swipe, Photos, Blurry,
+Similar. Apple indexes the name, subtitle and keywords of a localization together, so repeats waste characters. The
+two sets below share no word with each other or with the name and subtitle, and have no spaces.
+
+### English (US) (97/100)
 
 ```text
 storage,delete,duplicate,free,up,space,video,whatsapp,telegram,iphone,camera,roll,private,gallery
 ```
 
-No word repeats the name (Unhoard, Swipe, Photo, Cleaner) or subtitle (Screenshots, Blurry, Similar), so the starting
-list needed no fixes; there are no spaces. **Review risk, decide before submitting:** guideline 2.3.7 asks you not to
-pack metadata with "trademarked terms, popular app names, pricing information". `whatsapp`, `telegram` and `iphone`
-are trademarks and `free` can read as pricing, and `duplicate` may set an expectation the app doesn't meet (exact
-duplicates are left to Photos). A safer list with the same length budget:
+None of the starting words is in the new name or subtitle, so nothing had to be dropped.
+
+### English (UK) (95/100)
 
 ```text
-storage,delete,declutter,free,up,space,video,chat,saved,receipt,camera,roll,private,gallery,album
+declutter,recording,receipt,clips,large,memory,organise,tidy,bulk,remover,junk,album,chat,saved
 ```
 
-(97/100; still has `free`, which here reads as "free up space"; drop it for `cleanup` or `memory` if you want zero risk.)
+English (UK) is the default language in storefronts such as India, Indonesia and Turkey, so this set adds new search
+words there. It uses the UK spelling `organise`.
 
-## Promotional text (153/170)
+### Review risk, decide before submitting
+
+Guideline 2.3.7 asks you not to pack metadata with "trademarked terms, popular app names, pricing information". In the
+US set, `whatsapp`, `telegram` and `iphone` are trademarks, `free` can read as pricing, and `duplicate` may set an
+expectation the app doesn't meet (exact duplicates are left to Photos). A safer US set that still shares nothing with
+the UK set:
 
 ```text
-Clear screenshots, blurry and similar shots, big videos and chat-app media with a swipe. It all runs on your iPhone: no account, no ads, no subscription.
+storage,delete,free,up,space,video,camera,roll,private,gallery,phone,pictures,accidental,screen
 ```
 
-## Description (3693/4000)
+(95/100; it keeps `free`, which reads as "free up space" here; drop it if you want zero risk.) The UK set has no
+trademarks or price words.
+
+## Promotional text (168/170)
 
 ```text
-Unhoard helps you clear the clutter out of your photo library: screenshots, similar shots, blurry photos, big videos and accidental clips. Review them with a swipe or in a grid, collect what should go in one delete tray, and delete it all in one step.
+Clear old screenshots and screen recordings in one go, then swipe through blurry and similar shots and big videos. Runs on your iPhone. No account, ads or subscription.
+```
+
+## Description (3904/4000)
+
+US spelling. For English (UK), paste the same text with favorites → favourites, color → colour, labeled → labelled
+(UK version: 3909/4000).
+
+```text
+Got thousands of screenshots? Unhoard finds every screenshot and screen recording on your iPhone, oldest first, with how much space they take. Select them all or swipe through them one by one, then delete them in one step.
+
+Then keep going: similar shots, blurry photos, big videos, accidental clips and media saved from chat apps, all collected in one delete tray.
 
 Everything is scanned on your iPhone. No account, no ads, no subscription, no tracking. Unhoard is open source.
 
-WHAT IT FINDS
-• Screenshots & screen recordings, oldest first
+SCREENSHOTS FIRST
+• Screenshots and screen recordings in one place, oldest first, with their count and size
+• Select All skips favorites, edited screenshots and ones in your own albums, so the ones you kept on purpose stay
+• Or swipe: left to delete, right to keep, with Undo
+
+ALSO FINDS
 • Similar shots: photos taken within two minutes of each other that look alike, grouped, with the best one marked
 • Blurry photos with nothing in focus (dark and night shots are left out)
 • Utility shots: receipts, labels, whiteboards and other photos of things rather than moments
 • Large videos over 50 MB, biggest first
-• Accidental clips: very short clips that are dark or one flat colour, like a covered lens or a pocket
+• Accidental clips: very short clips that are dark or one flat color, like a covered lens or a pocket
 • Short moments: other clips under 3 seconds. Make Still saves the sharpest frame as a photo, with the clip's date and location
-• Saved from apps: media that chat and social apps saved to your library, labelled with the app
+• Saved from apps: media that chat and social apps saved to your library, labeled with the app
 • Sensitive photos: passports, IDs, cards, passwords and Wi-Fi labels. Move them to the locked Hidden album, or delete them one by one
 
-Each category shows how many items it holds and how much space they take.
-
 HOW YOU CLEAN
-• Swipe: left to delete, right to keep, with Undo
 • Grid: tap to select, drag sideways to select a range, long-press to preview
 • Compare: look at similar shots two at a time, zooming both together, and pick the one to keep
 • Delete tray: everything you pick waits in one tray, saved between launches, and goes in one step
 • History: see how much you've cleared over time
 
 YOUR MEMORIES COME FIRST
-• Favourites, edited photos and photos in your own albums are never selected for you
+• Favorites, edited photos and photos in your own albums are never selected for you
 • Only Similar Shots selects anything for you, and it always keeps the best of each group
 • Sensitive photos are never selected in bulk
 • Deleted items go to Recently Deleted in Photos and stay there for 30 days, so you can change your mind. The space comes back when Recently Deleted is emptied; Unhoard shows you how to do that in Photos
@@ -79,7 +104,7 @@ PRIVATE BY DESIGN
 Unhoard looks at small thumbnails of your photos on your iPhone, with Apple's Vision framework. The developer collects no data, and Unhoard has no server.
 
 AN OPTIONAL SECOND OPINION
-Not sure whether a borderline photo is a memory or clutter? Ask for a second opinion: each photo is labelled a memory, a utility shot or an accident, with a one-line reason. On iOS 27 with Apple Intelligence it runs on your iPhone. Or use Claude with your own Anthropic API key: a consent sheet first shows the exact small previews that will be sent (512 pixels at most, with no location, dates or camera details), and sensitive and hidden photos are never sent. The second opinion only labels photos; it never deletes or selects anything. You don't need it: Unhoard finds and cleans everything without it.
+Not sure whether a borderline photo is a memory or clutter? Ask for a second opinion: each photo is labeled a memory, a utility shot or an accident, with a one-line reason. On iOS 27 with Apple Intelligence it runs on your iPhone. Or use Claude with your own Anthropic API key: a consent sheet first shows the exact small previews that will be sent (512 pixels at most, with no location, dates or camera details), and sensitive and hidden photos are never sent. The second opinion only labels photos; it never deletes or selects anything. You don't need it: Unhoard finds and cleans everything without it.
 
 SCANS THAT PICK UP WHERE THEY LEFT OFF
 The first scan reads your library's details, not your originals. It's saved as it goes, so a stopped scan resumes, and later scans only read what changed. Leave the app and the scan keeps going for as long as iOS allows; an unfinished scan can also finish overnight while your iPhone is charging. Categories fill in while it runs, with a percentage and the time left.
@@ -91,10 +116,10 @@ Requires full access to your photo library, to find items and to delete the ones
 Open source under the MIT license: github.com/kleash/unhoard
 ```
 
-## What's New in This Version (204/4000)
+## What's New in This Version (226/4000)
 
 ```text
-First release. Find and clear screenshots, similar shots, blurry photos, utility shots, large videos, short clips and media saved from chat apps, with a swipe or in a grid. Everything runs on your iPhone.
+First release. Clear screenshots and screen recordings in one go, then similar shots, blurry photos, utility shots, large videos, short clips and media saved from chat apps, with a swipe or in a grid. Scans run on your iPhone.
 ```
 
 App Store Connect may not show this field for a first version; if it doesn't, keep it for the release notes on GitHub.
@@ -196,10 +221,10 @@ photos. The UI walkthrough (`-scheme UnhoardUI`) and the `-Unhoard*` debug launc
 celebration demo) produce most of these; Similar Shots and Utility Shots need a real iPhone or the simulator
 stand-ins.
 
-1. **Home: categories with counts and sizes.** Caption: "See what's taking up space"
-2. **Swipe mode, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
+1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go"
+2. **Swipe mode on a screenshot, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
 3. **Compare in Similar Shots, Best badge visible.** Caption: "Keep the best of every similar shot"
-4. **Delete tray, then the summary card.** Caption: "Check everything, delete in one step"
+4. **Home: all categories with counts and sizes.** Caption: "Blurry shots, big videos and more"
 5. **Home trust row or the Claude consent sheet.** Caption: "Scanned on your iPhone. No account, no ads"
 
 Avoid captions like "Everything stays on your iPhone" without the Claude caveat, and any "free" price wording on the

@@ -179,6 +179,15 @@ final class TrayTests: XCTestCase {
         XCTAssertEqual(DeleteTray(file: url).unswiped(items).map(\.id), ["b", "c"])
     }
 
+    func testScreenshotCountLine() {
+        let en = Locale(identifier: "en_US")
+        XCTAssertNil(CleanerLibrary.countLine(count: 499, oldest: .now, locale: en), "under 500, nothing to share")
+        let march2017 = Calendar.current.date(from: DateComponents(year: 2017, month: 3, day: 15, hour: 12))!
+        XCTAssertEqual(CleanerLibrary.countLine(count: 6214, oldest: march2017, locale: en),
+                       "I have 6,214 screenshots on my iPhone. The oldest is from March 2017. "
+                       + "Counted on my phone by Unhoard (free, nothing uploaded): https://kleash.github.io/unhoard/")
+    }
+
     func testOnThisDayIsTodaysDateInEarlierYears() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
