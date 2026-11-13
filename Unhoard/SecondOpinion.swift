@@ -493,6 +493,10 @@ struct SecondOpinionSettings: View {
                     Text("Optional, and not needed to use Unhoard. When you ask Claude, Unhoard first shows the small previews it will send to Anthropic with your key; usage is billed to your Anthropic account. Sensitive and hidden photos are never sent.")
                 }
                 if !message.isEmpty { Text(message) }
+                Section {
+                    Link(destination: .rateUnhoard) { Label("Rate on the App Store", systemImage: "star.fill") }
+                        .accessibilityIdentifier("rateLink")
+                }
             }
             .scrollContentBackground(.hidden)
             .background { CleanerBackdrop(tint: .orange, accent: .purple) }

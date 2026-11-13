@@ -218,6 +218,9 @@ struct CleanerHistoryView: View {
                 .padding()
                 .cleanerGlass()
                 .padding()
+                Link(destination: .rateUnhoard) { Label("Rate on the App Store", systemImage: "star.fill") }
+                    .font(.subheadline.bold())
+                    .accessibilityIdentifier("rateLink")
             }
             .background { CleanerBackdrop(tint: .green, accent: .blue) }
             .navigationTitle("History")
@@ -241,3 +244,8 @@ extension CleanerHistory {
     }
 }
 #endif
+
+extension URL {
+    /// The App Store's write-a-review page for Unhoard.
+    static let rateUnhoard = URL(string: "https://apps.apple.com/app/id6833769781?action=write-review")!
+}
