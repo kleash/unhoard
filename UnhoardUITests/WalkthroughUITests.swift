@@ -358,6 +358,20 @@ final class WalkthroughUITests: XCTestCase {
         let left = across.subtracting(min(start, end)...max(start, end))
         check(left, "a sweep from a selected shot deselects")
 
+        // After a full-screen cover (Compare) closes, the cells under it still take a sweep (they kept their frames).
+        deselectAll()
+        el("compareButton").tap()
+        XCTAssertTrue(el("compareDone").waitForExistence(timeout: 5))
+        el("compareDone").tap()
+        sleep(1)
+        sweep(0, rowEnd)
+        check(Set(sweepable.filter { $0 <= rowEnd }), "a sweep works right after Compare closes")
+        deselectAll()
+        sweep(from, to)
+        check(across, "and across groups")
+        sweep(start, end)
+        check(left, "back to where the deselect left it")
+
         // A tap still picks a keeper, and takes it out again.
         all[0].tap()
         check(left.union([0]), "tapping a keeper adds it")

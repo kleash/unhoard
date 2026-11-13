@@ -167,6 +167,14 @@ struct AssetGrid<Header: View>: View {
     private var shownGroups: [[AssetRecord]]? { filter == .all ? groups : groups.map { $0.map { $0.filter(passes) }.filter { !$0.isEmpty } } }
     /// The cells in on-screen order: what a drag ranges over.
     private var order: [AssetRecord] { shownGroups?.flatMap { $0 } ?? shown }
+    /// Changes whenever cells can move: their order, the column count or the grid's width.
+    private var layoutKey: Int {
+        var h = Hasher()
+        h.combine(columns)
+        h.combine(width)
+        order.forEach { h.combine($0.id) }
+        return h.finalize()
+    }
     private let spacing: CGFloat = 2
 
     private var side: CGFloat { max(1, (width - spacing * CGFloat(columns - 1)) / CGFloat(columns)) }
@@ -182,12 +190,13 @@ struct AssetGrid<Header: View>: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
             .accessibilityIdentifier("trayFilter")
+            let layout = layoutKey
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: columns), spacing: spacing) {
                 if let groups = shownGroups {
                     let position = Dictionary(shown.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
                     ForEach(groups, id: \.[0].id) { group in
                         Section {
-                            ForEach(group) { cell(position[$0.id] ?? 0, $0) }
+                            ForEach(group) { cell(position[$0.id] ?? 0, $0, layout) }
                         } header: {
                             HStack {
                                 Text("\(group.count) similar · \(group[0].created?.formatted(date: .abbreviated, time: .shortened) ?? "")")
@@ -221,7 +230,7 @@ struct AssetGrid<Header: View>: View {
                         }
                     }
                 } else {
-                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, record in cell(i, record) }
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { i, record in cell(i, record, layout) }
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
@@ -247,16 +256,16 @@ struct AssetGrid<Header: View>: View {
         .fullScreenCover(item: $preview) { AssetPreview(records: shown, start: $0).environment(library).environment(tray) }
     }
 
-    private func cell(_ i: Int, _ record: AssetRecord) -> some View {
+    private func cell(_ i: Int, _ record: AssetRecord, _ layout: Int) -> some View {
         AssetThumbnail(record: record, asset: assets[record.id], pixels: pixels, selected: isSelected(record), caption: caption(record))
             .frame(height: side)
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("grid")) } action: { frames.byID[record.id] = $0 }
+            // Tagged with the layout: a layout change re-reports every live cell, and older frames stop counting.
+            .onGeometryChange(for: Frames.Entry.self) { .init(layout: layout, rect: $0.frame(in: .named("grid"))) } action: { frames.byID[record.id] = $0 }
             .contentShape(Rectangle())
             .onTapGesture { tray.toggle(record.id) }
             .onLongPressGesture(minimumDuration: 0.25) { preview = record }
             .accessibilityAction(named: "Preview") { preview = record }
             .onAppear { if i % columns == 0 || groups != nil { cache(around: i) } }
-            .onDisappear { frames.byID[record.id] = nil } // a lazy grid drops off-screen cells: a stale frame would hit wrong
     }
 
     private func isSelected(_ r: AssetRecord) -> Bool {
@@ -266,7 +275,8 @@ struct AssetGrid<Header: View>: View {
 
     /// The `order` index of the cell under a point in the grid; nil between cells or on a group header.
     private func index(at p: CGPoint, in order: [AssetRecord]) -> Int? {
-        guard let id = frames.byID.first(where: { $0.value.contains(p) })?.key else { return nil }
+        let layout = layoutKey
+        guard let id = frames.byID.first(where: { $0.value.layout == layout && $0.value.rect.contains(p) })?.key else { return nil }
         return order.firstIndex { $0.id == id }
     }
 
@@ -309,7 +319,11 @@ struct AssetGrid<Header: View>: View {
 }
 
 /// Cell frames by id, written as cells lay out; a class so frame updates don't redraw the grid while it scrolls.
-private final class Frames { var byID: [String: CGRect] = [:] }
+/// Never removed when a cell scrolls off (its frame in the grid stays right until the layout changes).
+private final class Frames {
+    struct Entry: Equatable { var layout: Int; var rect: CGRect }
+    var byID: [String: Entry] = [:]
+}
 
 extension AssetGrid where Header == EmptyView {
     init(items: [AssetRecord]) { self.init(items: items, header: { EmptyView() }) }
@@ -333,11 +347,17 @@ struct AssetThumbnail: View {
             .overlay { if selected { Color.black.opacity(0.25) } }
             .overlay(alignment: .bottomTrailing) {
                 if record.isVideo {
-                    Text(Duration.seconds(record.duration.rounded()).formatted(.time(pattern: .minuteSecond)))
-                        .font(.caption2.bold().monospacedDigit())
-                        .foregroundStyle(.white)
-                        .shadow(radius: 2)
-                        .padding(4)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        if record.bytes > 0 { Text(record.bytes.formatted(.byteCount(style: .file))) }
+                        Text(Duration.seconds(record.duration.rounded()).formatted(.time(pattern: .minuteSecond)))
+                    }
+                    .font(.caption2.bold().monospacedDigit())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .background(.black.opacity(0.35), in: RoundedRectangle(cornerRadius: 4)) // readable over bright frames
+                    .padding(4)
                 }
             }
             .overlay(alignment: .bottomLeading) { GuardBadge(record: record).padding(4) }
