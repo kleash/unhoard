@@ -126,7 +126,9 @@ Requires full access to your photo library, to find items and to delete the ones
 Open source under the MIT license: github.com/kleash/unhoard
 ```
 
-## What's New in This Version (226/4000)
+## What's New in This Version
+
+1.0.0 (226/4000):
 
 ```text
 First release. Clear screenshots and screen recordings in one go, then similar shots, blurry photos, utility shots, large videos, short clips and media saved from chat apps, with a swipe or in a grid. Scans run on your iPhone.
@@ -231,7 +233,7 @@ photos. The UI walkthrough (`-scheme UnhoardUI`) and the `-Unhoard*` debug launc
 celebration demo) produce most of these; Similar Shots and Utility Shots need a real iPhone or the simulator
 stand-ins.
 
-1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go"
+1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go" (live). Next feature release: "Private cleanup, right on your iPhone" (chosen 2026-11-13; ship with new features, not on its own)
 2. **Swipe mode on a screenshot, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
 3. **Compare in Similar Shots, Best badge visible.** Caption: "Keep the best of every similar shot"
 4. **Home: all categories with counts and sizes.** Caption: "Blurry shots, big videos and more"
