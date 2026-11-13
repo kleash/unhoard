@@ -140,7 +140,7 @@ struct CompareGroup: Identifiable {
 /// A Photos-style grid: tap toggles tray membership, long-press previews, a horizontal-first drag selects a range.
 struct AssetGrid<Header: View>: View {
     let items: [AssetRecord]
-    /// Shown as groups under a header (Similar shots), `items` in the same order. Drag-select is off then.
+    /// Shown as groups under a header (Similar shots), keeper first; a drag sweeps them in this on-screen order.
     var groups: [[AssetRecord]]?
     /// A short label on a thumbnail.
     var caption: (AssetRecord) -> String? = { _ in nil }
@@ -155,7 +155,8 @@ struct AssetGrid<Header: View>: View {
     @State private var assets: [String: PHAsset] = [:]
     @State private var width: CGFloat = 0
     @State private var cached: Set<String> = [] // ids, not positions: items shrink after a delete
-    @State private var drag: (start: Int, range: ClosedRange<Int>, adds: Bool)?
+    @State private var drag: (start: Int, adds: Bool, ids: Set<String>)? // ids: what the sweep so far will add or remove
+    @State private var frames = Frames()
     @State private var preview: AssetRecord?
     @AppStorage("gridColumns") private var columns = 4 // pinch to change, like Photos
     @State private var filter = TrayFilter.all
@@ -164,6 +165,8 @@ struct AssetGrid<Header: View>: View {
     private func passes(_ r: AssetRecord) -> Bool { filter == .all || tray.contains(r.id) == (filter == .selected) }
     private var shown: [AssetRecord] { filter == .all ? items : items.filter(passes) }
     private var shownGroups: [[AssetRecord]]? { filter == .all ? groups : groups.map { $0.map { $0.filter(passes) }.filter { !$0.isEmpty } } }
+    /// The cells in on-screen order: what a drag ranges over.
+    private var order: [AssetRecord] { shownGroups?.flatMap { $0 } ?? shown }
     private let spacing: CGFloat = 2
 
     private var side: CGFloat { max(1, (width - spacing * CGFloat(columns - 1)) / CGFloat(columns)) }
@@ -222,6 +225,7 @@ struct AssetGrid<Header: View>: View {
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .coordinateSpace(.named("grid"))
             .gesture(DragSelectGesture(changed: dragged))
         }
         .simultaneousGesture(MagnifyGesture().onEnded { value in
@@ -229,7 +233,7 @@ struct AssetGrid<Header: View>: View {
             withAnimation(.snappy) { columns = min(6, max(2, next)) }
         })
         .sensoryFeedback(.selection, trigger: tray.count)
-        .sensoryFeedback(.selection, trigger: drag?.range)
+        .sensoryFeedback(.selection, trigger: drag?.ids)
         .task(id: items.map(\.id)) {
             let ids = items.map(\.id)
             assets = await Task.detached {
@@ -244,42 +248,47 @@ struct AssetGrid<Header: View>: View {
     }
 
     private func cell(_ i: Int, _ record: AssetRecord) -> some View {
-        AssetThumbnail(record: record, asset: assets[record.id], pixels: pixels, selected: isSelected(i, record), caption: caption(record))
+        AssetThumbnail(record: record, asset: assets[record.id], pixels: pixels, selected: isSelected(record), caption: caption(record))
             .frame(height: side)
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("grid")) } action: { frames.byID[record.id] = $0 }
             .contentShape(Rectangle())
             .onTapGesture { tray.toggle(record.id) }
             .onLongPressGesture(minimumDuration: 0.25) { preview = record }
             .accessibilityAction(named: "Preview") { preview = record }
             .onAppear { if i % columns == 0 || groups != nil { cache(around: i) } }
+            .onDisappear { frames.byID[record.id] = nil } // a lazy grid drops off-screen cells: a stale frame would hit wrong
     }
 
-    private func isSelected(_ i: Int, _ r: AssetRecord) -> Bool {
-        if let drag, drag.range.contains(i), !(drag.adds && r.isKeptFromBulk) { return drag.adds }
+    private func isSelected(_ r: AssetRecord) -> Bool {
+        if let drag, drag.ids.contains(r.id) { return drag.adds }
         return tray.contains(r.id)
     }
 
-    /// The item under a point in the grid, clamped to the grid.
-    private func index(at p: CGPoint) -> Int {
-        let col = min(columns - 1, max(0, Int(p.x / (side + spacing))))
-        let row = max(0, Int(p.y / (side + spacing)))
-        return min(shown.count - 1, row * columns + col)
+    /// The `order` index of the cell under a point in the grid; nil between cells or on a group header.
+    private func index(at p: CGPoint, in order: [AssetRecord]) -> Int? {
+        guard let id = frames.byID.first(where: { $0.value.contains(p) })?.key else { return nil }
+        return order.firstIndex { $0.id == id }
+    }
+
+    /// What sweeping `range` of `order` changes: adding never picks guarded memories, sensitive items or a group's keeper; tap them.
+    private func sweep(_ order: [AssetRecord], _ range: ClosedRange<Int>, adds: Bool) -> Set<String> {
+        let swept = Array(order[range.clamped(to: 0...max(0, order.count - 1))])
+        return Set(adds ? DeleteTray.selectable(swept, groups: groups) : swept.map(\.id))
     }
 
     private func dragged(_ p: CGPoint, _ state: UIGestureRecognizer.State) {
-        // shortcut: no drag-select in grouped grids (headers break the row maths); tap items there.
-        guard !shown.isEmpty, groups == nil else { return }
+        let order = order
         switch state {
         case .began:
-            let i = index(at: p)
-            drag = (i, i...i, !tray.contains(shown[i].id))
+            guard let i = index(at: p, in: order) else { return }
+            let adds = !tray.contains(order[i].id)
+            drag = (i, adds, sweep(order, i...i, adds: adds))
         case .changed:
-            guard let d = drag else { return }
-            let i = index(at: p)
-            drag?.range = min(d.start, i)...max(d.start, i)
+            guard let d = drag, let i = index(at: p, in: order) else { return } // between cells: keep the range so far
+            drag?.ids = sweep(order, min(d.start, i)...max(d.start, i), adds: d.adds)
         case .ended:
             guard let d = drag else { return }
-            let ids = shown[d.range.clamped(to: 0...max(0, shown.count - 1))].filter { !d.adds || !$0.isKeptFromBulk }.map(\.id) // a sweep never adds guarded memories or sensitive items; tap them
-            d.adds ? tray.add(ids) : tray.remove(ids)
+            d.adds ? tray.add(d.ids) : tray.remove(d.ids)
             drag = nil
         default:
             drag = nil
@@ -298,6 +307,9 @@ struct AssetGrid<Header: View>: View {
         cached = new
     }
 }
+
+/// Cell frames by id, written as cells lay out; a class so frame updates don't redraw the grid while it scrolls.
+private final class Frames { var byID: [String: CGRect] = [:] }
 
 extension AssetGrid where Header == EmptyView {
     init(items: [AssetRecord]) { self.init(items: items, header: { EmptyView() }) }

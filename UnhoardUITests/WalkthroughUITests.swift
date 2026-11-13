@@ -294,6 +294,93 @@ final class WalkthroughUITests: XCTestCase {
 
     }
 
+    /// Similar Shots: sweeps within a group and across groups select what they pass but never a keeper or a guarded item,
+    /// a sweep from a selected shot deselects, and the cells shown as selected, the Delete button, the commit sheet and the
+    /// home card agree. Never confirms the delete.
+    func testSimilarDragSelect() throws {
+        launch(dark, "-UnhoardSimulatorStandIns")
+        if el("accessButton").waitForExistence(timeout: 3) { throw XCTSkip("Grant Photos access first (README).") }
+        XCTAssertTrue(el("card-similar").waitForExistence(timeout: 10))
+        waitForScan()
+        el("card-similar").tap()
+        XCTAssertTrue(el("similarGroupHeader").waitForExistence(timeout: 10), "the stand-ins find Similar groups")
+        func deselectAll() {
+            if el("selectAllButton").label == "Select All" { el("selectAllButton").tap() }
+            el("selectAllButton").tap()
+            XCTAssertEqual(trayCount, 0)
+        }
+        deselectAll()
+
+        // The first two groups' cells, in on-screen order (both fit on screen with the sample media).
+        let sizes = app.descendants(matching: .any).matching(identifier: "similarGroupHeader").allElementsBoundByIndex
+            .map { Int($0.label.prefix(while: \.isNumber)) ?? 0 }
+        XCTAssertGreaterThanOrEqual(sizes.count, 2, "two Similar groups to sweep across")
+        let all = cells.allElementsBoundByIndex
+        let group = sizes.prefix(2).enumerated().flatMap { g, n in Array(repeating: g, count: n) }
+        XCTAssertGreaterThanOrEqual(all.count, group.count)
+        let frames = group.indices.map { all[$0].frame }
+        let sweepable = group.indices.filter { i in
+            let label = all[i].label
+            return !label.hasPrefix("Best") && !["Favourite", "Edited", "In an album"].contains { label.contains($0) }
+        }
+        func selected() -> Set<Int> { Set(group.indices.filter { all[$0].value as? String == "In delete tray" }) }
+        func sideways(_ i: Int, _ j: Int) -> Bool { abs(frames[j].midX - frames[i].midX) > 1.3 * abs(frames[j].midY - frames[i].midY) }
+        func sweep(_ i: Int, _ j: Int) {
+            let a = all[i].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            a.press(forDuration: 0.05, thenDragTo: all[j].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                    withVelocity: .slow, thenHoldForDuration: 0.2)
+            sleep(1)
+        }
+        func check(_ expected: Set<Int>, _ what: String) {
+            XCTAssertEqual(selected(), expected, what)
+            XCTAssertEqual(trayCount, expected.count, "the Delete button counts what's shown selected: " + what)
+        }
+
+        // Within the first group: from its keeper along its first row.
+        let rowEnd = group.indices.last { group[$0] == 0 && abs(frames[$0].midY - frames[0].midY) < 1 }!
+        sweep(0, rowEnd)
+        check(Set(sweepable.filter { $0 <= rowEnd }), "a sweep within a group skips its keeper")
+
+        // Across groups: the most sideways pair from the first group into the second (the drag must start sideways).
+        deselectAll()
+        let pairs = group.indices.filter { group[$0] == 0 }.flatMap { i in group.indices.filter { group[$0] == 1 }.map { (i, $0) } }
+        let (from, to) = try XCTUnwrap(pairs.filter { sideways($0, $1) }.max { abs(frames[$0.1].midX - frames[$0.0].midX) < abs(frames[$1.1].midX - frames[$1.0].midX) },
+                                       "a sideways start into the next group")
+        let across = Set(sweepable.filter { (min(from, to)...max(from, to)).contains($0) })
+        sweep(from, to)
+        check(across, "a sweep across groups selects both groups' shots in screen order, never a keeper")
+        shot("similar-drag-select")
+
+        // Deselect: from a selected shot along its row.
+        let start = try XCTUnwrap(across.sorted().first { s in group.indices.contains { $0 != s && abs(frames[$0].midY - frames[s].midY) < 1 } })
+        let end = group.indices.filter { $0 != start && abs(frames[$0].midY - frames[start].midY) < 1 }.max { abs($0 - start) < abs($1 - start) }!
+        sweep(start, end)
+        let left = across.subtracting(min(start, end)...max(start, end))
+        check(left, "a sweep from a selected shot deselects")
+
+        // A tap still picks a keeper, and takes it out again.
+        all[0].tap()
+        check(left.union([0]), "tapping a keeper adds it")
+        all[0].tap()
+        check(left, "tapping it again takes it out")
+
+        // The commit sheet and the home card count the same items (closed without deleting).
+        if !left.isEmpty {
+            el("deleteButton").tap()
+            XCTAssertTrue(el("commitDeleteButton").waitForExistence(timeout: 5))
+            XCTAssertEqual(el("commitDeleteButton").label, "Delete \(left.count) Item" + (left.count == 1 ? "" : "s"))
+            app.buttons["Close"].tap()
+            sleep(1)
+        }
+        back()
+        XCTAssertTrue(el("card-similar").label.contains(left.isEmpty ? "" : "\(left.count) in tray"), el("card-similar").label)
+        // Put back what Similar pre-selects, for the other tests.
+        el("card-similar").tap()
+        XCTAssertTrue(cells.firstMatch.waitForExistence(timeout: 10))
+        deselectAll()
+        el("selectAllButton").tap()
+    }
+
     var askClaude: XCUIElement { app.buttons.matching(NSPredicate(format: "identifier == 'askClaude' OR label BEGINSWITH 'Ask Claude'")).firstMatch }
 
     func back() { app.navigationBars.buttons.element(boundBy: 0).tap() }
