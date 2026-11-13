@@ -128,6 +128,16 @@ Open source under the MIT license: github.com/kleash/unhoard
 
 ## What's New in This Version
 
+1.0.1:
+
+```text
+- Swipe across Similar Shots to select them, even across groups
+- Video thumbnails show each video's size
+- Rate Unhoard from History or Settings
+- Fixed: a kept "Best" shot no longer lingers after the rest of its group is deleted
+- Fixed: swipes now work on the first screen of Similar Shots
+```
+
 1.0.0 (226/4000):
 
 ```text
@@ -233,7 +243,7 @@ photos. The UI walkthrough (`-scheme UnhoardUI`) and the `-Unhoard*` debug launc
 celebration demo) produce most of these; Similar Shots and Utility Shots need a real iPhone or the simulator
 stand-ins.
 
-1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go" (live). Next feature release: "Private cleanup, right on your iPhone" (chosen 2026-11-13, ready-made at docs/media/store-next-01.png; ship with new features, not on its own)
+1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Private cleanup, right on your iPhone" (from 1.0.1; image docs/media/store-next-01.png; 1.0.0 had "Clear old screenshots in one go")
 2. **Swipe mode on a screenshot, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
 3. **Compare in Similar Shots, Best badge visible.** Caption: "Keep the best of every similar shot"
 4. **Home: all categories with counts and sizes.** Caption: "Blurry shots, big videos and more"
