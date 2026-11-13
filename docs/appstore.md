@@ -62,10 +62,12 @@ storage,delete,free,up,space,video,camera,roll,private,gallery,phone,pictures,ac
 (95/100; it keeps `free`, which reads as "free up space" here; drop it if you want zero risk.) The UK set has no
 trademarks or price words.
 
-## Promotional text (168/170)
+## Promotional text (153/170)
+
+Leads with privacy (changed 2026-11-13 on the live listing; promotional text needs no review).
 
 ```text
-Clear old screenshots and screen recordings in one go, then swipe through blurry and similar shots and big videos. Runs on your iPhone. No account, ads or subscription.
+Private by design: every scan runs on your iPhone. No account, no tracking, no ads. Clear old screenshots, blurry and similar shots and big videos, free.
 ```
 
 ## Description (3904/4000)
