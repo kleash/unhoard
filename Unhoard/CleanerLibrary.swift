@@ -569,6 +569,8 @@ enum LibraryScanner {
         if let unsupported = cache.aestheticsUnsupported { aestheticsUnsupported = unsupported } // partial checkpoints don't know yet
         self.sections = kept ? CleanupCategory.sections(records.values)
             : deleted.isEmpty ? sections : sections.mapValues { $0.filter { !deleted.contains($0.id) } }
+        // Regroup what's left: a Similar keeper whose shots were all deleted is in no group any more, so it leaves Similar.
+        if !deleted.isEmpty { self.sections[.similar] = SimilarShots.groups(self.sections[.similar] ?? []).flatMap { $0 } }
         if kept { save() }
     }
 }

@@ -248,6 +248,24 @@ final class TrayTests: XCTestCase {
         XCTAssertEqual(tray.ids, ["mine", "auto"], "offered afresh")
     }
 
+    @MainActor func testDeletingAGroupsShotsTakesItsLoneKeeperOutOfSimilar() {
+        func shot(_ id: String, at t: TimeInterval, after prev: String = "") -> AssetRecord {
+            var r = rec(id, modified: t)
+            r.sharpness = 100
+            r.similarPrev = prev
+            r.similarToPrev = !prev.isEmpty
+            return r
+        }
+        let records = [shot("a", at: 0), shot("b", at: 10, after: "a"), shot("c", at: 20, after: "b"),
+                       shot("d", at: 1000), shot("e", at: 1010, after: "d")]
+        let file = url.appendingPathExtension("library")
+        ScanCache(records: Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })).save(to: file)
+        let library = CleanerLibrary(file: file)
+        XCTAssertEqual(library.sections[.similar]?.map(\.id), ["d", "e", "a", "b", "c"])
+        library.remove(["b", "c"]) // what a delete does once the tray's commit goes through
+        XCTAssertEqual(library.sections[.similar]?.map(\.id), ["d", "e"], "a keeper left on its own is no longer counted or selectable")
+    }
+
     @MainActor func testCommitDeletesOnlyTheGivenIDs() async {
         let tray = DeleteTray(file: url)
         tray.add(["a", "b", "c"]) // not in the photo library, so nothing reaches PhotoKit's dialog

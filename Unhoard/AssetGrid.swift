@@ -100,6 +100,12 @@ struct CategoryGridView: View {
             if category == .screenshots, let line = library.screenshotCountLine {
                 ShareLink("Share your count", item: line).font(.subheadline.weight(.semibold)).accessibilityIdentifier("shareCount")
             }
+            if category != .sensitive, items.contains(where: \.isGuarded) {
+                Label("Favourites, edited items and album items have a badge and are never selected for you, not even by Select All. Tap one to add it.",
+                      systemImage: "heart.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
             if category == .sensitive {
                 Label("Never selected for you. Open one to hide it, or tap to add it to the tray.", systemImage: "eye.slash")
                     .font(.subheadline.weight(.medium))
