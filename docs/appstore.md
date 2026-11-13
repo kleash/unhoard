@@ -233,7 +233,7 @@ photos. The UI walkthrough (`-scheme UnhoardUI`) and the `-Unhoard*` debug launc
 celebration demo) produce most of these; Similar Shots and Utility Shots need a real iPhone or the simulator
 stand-ins.
 
-1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go" (live). Next feature release: "Private cleanup, right on your iPhone" (chosen 2026-11-13; ship with new features, not on its own)
+1. **Screenshots & Recordings: count, total size and Select All.** Caption: "Clear old screenshots in one go" (live). Next feature release: "Private cleanup, right on your iPhone" (chosen 2026-11-13, ready-made at docs/media/store-next-01.png; ship with new features, not on its own)
 2. **Swipe mode on a screenshot, card mid-swipe with the DELETE stamp.** Caption: "Swipe left to delete, right to keep"
 3. **Compare in Similar Shots, Best badge visible.** Caption: "Keep the best of every similar shot"
 4. **Home: all categories with counts and sizes.** Caption: "Blurry shots, big videos and more"
