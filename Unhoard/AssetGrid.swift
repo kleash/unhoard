@@ -101,7 +101,7 @@ struct CategoryGridView: View {
                 ShareLink("Share your count", item: line).font(.subheadline.weight(.semibold)).accessibilityIdentifier("shareCount")
             }
             if category != .sensitive, items.contains(where: \.isGuarded) {
-                Label("Favourites, edited items and album items have a badge and are never selected for you, not even by Select All. Tap one to add it.",
+                Label("Favourites, edited items and album items have a badge and are never selected for you, not even by Select All. Tap one to add it; a swipe also picks edited ones.",
                       systemImage: "heart.fill")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -280,10 +280,13 @@ struct AssetGrid<Header: View>: View {
         return order.firstIndex { $0.id == id }
     }
 
-    /// What sweeping `range` of `order` changes: adding never picks guarded memories, sensitive items or a group's keeper; tap them.
+    /// What sweeping `range` of `order` changes.
     private func sweep(_ order: [AssetRecord], _ range: ClosedRange<Int>, adds: Bool) -> Set<String> {
         let swept = Array(order[range.clamped(to: 0...max(0, order.count - 1))])
-        return Set(adds ? DeleteTray.selectable(swept, groups: groups) : swept.map(\.id))
+        guard adds else { return Set(swept.map(\.id)) }
+        // You see what a swipe crosses, so it takes edited shots; never favourites, album items, sensitive items or a group's Best.
+        let keepers = Set((groups ?? []).map(\.[0].id))
+        return Set(swept.filter { !keepers.contains($0.id) && !$0.isFavorite && !$0.inUserAlbum && !$0.isSensitive }.map(\.id))
     }
 
     private func dragged(_ p: CGPoint, _ state: UIGestureRecognizer.State) {

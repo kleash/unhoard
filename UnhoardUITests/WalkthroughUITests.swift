@@ -321,7 +321,7 @@ final class WalkthroughUITests: XCTestCase {
         let frames = group.indices.map { all[$0].frame }
         let sweepable = group.indices.filter { i in
             let label = all[i].label
-            return !label.hasPrefix("Best") && !["Favourite", "Edited", "In an album"].contains { label.contains($0) }
+            return !label.hasPrefix("Best") && !["Favourite", "In an album"].contains { label.contains($0) }
         }
         func selected() -> Set<Int> { Set(group.indices.filter { all[$0].value as? String == "In delete tray" }) }
         func sideways(_ i: Int, _ j: Int) -> Bool { abs(frames[j].midX - frames[i].midX) > 1.3 * abs(frames[j].midY - frames[i].midY) }
